@@ -13,33 +13,96 @@ const accountModal = document.querySelector("#accountModal");
 function urlBase64ToUint8Array(base64String){const padding="=".repeat((4-base64String.length%4)%4),base64=(base64String+padding).replace(/-/g,"+").replace(/_/g,"/");const raw=atob(base64);return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)));}
 
 async function setupNotifications(){
-  if(!("Notification" in window)){
-    alert("Notifications are not supported on this browser.");
+  if(!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)){
+    alert("Push notifications are not supported in this browser.");
     return;
   }
   if(!window.isSecureContext){
     alert("Notifications require HTTPS.");
     return;
   }
+
   try{
-    if("serviceWorker" in navigator){
-      await navigator.serviceWorker.register("./service-worker.js");
-    }
-    const permission=await Notification.requestPermission();
-    if(permission==="granted"){
-      const reg=await navigator.serviceWorker.ready;
-      let sub=await reg.pushManager.getSubscription();
-      if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY)});
-      const save=await fetch(SUPABASE_URL+"/functions/v1/tiktok-snapshots",{method:"POST",headers:{"Content-Type":"application/json","apikey":SUPABASE_PUBLISHABLE_KEY},body:JSON.stringify({action:"subscribe",subscription:sub.toJSON()})});
-      if(!save.ok) throw new Error("Push subscription could not be saved");
-      localStorage.setItem("cm_notifications_enabled","1");
-      alert("Notifications enabled. Push alerts are ready.");
-    }else{
+    const permission = Notification.permission === "granted"
+      ? "granted"
+      : await Notification.requestPermission();
+
+    if(permission !== "granted"){
       localStorage.removeItem("cm_notifications_enabled");
-      alert("Notifications are disabled. Allow them from your browser settings.");
+      alert("Notifications are disabled. Allow notifications for this site in Chrome settings, then try again.");
+      return;
     }
+
+    let reg = await navigator.serviceWorker.register("./service-worker.js", {
+      scope: "./",
+      updateViaCache: "none"
+    });
+    await reg.update().catch(()=>{});
+    reg = await navigator.serviceWorker.ready;
+
+    const currentKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
+    let sub = await reg.pushManager.getSubscription();
+
+    // If a subscription exists but was created with another VAPID key,
+    // remove it before creating a new one.
+    if(sub){
+      try{
+        const existingKey = sub.options && sub.options.applicationServerKey;
+        if(existingKey){
+          const a = new Uint8Array(existingKey);
+          const b = new Uint8Array(currentKey);
+          const same = a.length === b.length && a.every((v,i)=>v===b[i]);
+          if(!same){
+            await sub.unsubscribe().catch(()=>{});
+            sub = null;
+          }
+        }
+      }catch(e){}
+    }
+
+    if(!sub){
+      try{
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly:true,
+          applicationServerKey:currentKey
+        });
+      }catch(firstError){
+        // Clear a possibly stale worker registration and retry once.
+        await navigator.serviceWorker.getRegistrations().then(list =>
+          Promise.all(list.map(x => x.unregister()))
+        ).catch(()=>{});
+        reg = await navigator.serviceWorker.register("./service-worker.js", {
+          scope:"./",
+          updateViaCache:"none"
+        });
+        await navigator.serviceWorker.ready;
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly:true,
+          applicationServerKey:currentKey
+        });
+      }
+    }
+
+    const save=await fetch(SUPABASE_URL+"/functions/v1/tiktok-snapshots",{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        "apikey":SUPABASE_PUBLISHABLE_KEY
+      },
+      body:JSON.stringify({action:"subscribe",subscription:sub.toJSON()})
+    });
+
+    if(!save.ok){
+      const data=await save.json().catch(()=>({}));
+      throw new Error(data.error || "Push subscription could not be saved");
+    }
+
+    localStorage.setItem("cm_notifications_enabled","1");
+    alert("Notifications enabled. Push alerts are ready.");
   }catch(e){
-    alert("Could not enable notifications: "+(e.message||e));
+    const name=e?.name ? " ("+e.name+")" : "";
+    const msg=e?.message || String(e);
+    alert("Could not enable notifications"+name+": "+msg+"\n\nIf Chrome still shows 'push service error', the phone's Chrome/Google push service is refusing the subscription, not the Content Monitor server.");
   }
 }
 window.setupNotifications=setupNotifications;
