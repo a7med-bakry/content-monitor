@@ -233,6 +233,41 @@ window.showTikTokHistory = function(videoId, title){
   overlay.querySelector("#closeHistory").onclick = () => overlay.remove();
 };
 
+function loadTikTokMonitors(){try{return JSON.parse(localStorage.getItem("cm_tiktok_monitors")||"{}");}catch(e){return {};}}
+function saveTikTokMonitors(data){localStorage.setItem("cm_tiktok_monitors",JSON.stringify(data));}
+function formatLocalDateTime(ts){const d=new Date(ts),p=n=>String(n).padStart(2,"0");return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours())+":"+p(d.getMinutes());}
+window.openTikTokMonitor=function(video,account){
+ const id=String(video.id),monitors=loadTikTokMonitors(),old=monitors[id]||{},now=Date.now(),o=document.createElement("div");
+ o.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:11000;overflow:auto;padding:20px;";
+ o.innerHTML=`<div style="max-width:650px;margin:30px auto;background:#111;color:#fff;border-radius:18px;padding:20px">
+ <button id="closeMonitor" class="secondary" style="float:right">Close</button><h2>How should this video grow?</h2>
+ <div style="opacity:.7;font-size:13px;margin-bottom:18px">${video.title||video.video_description||"TikTok Video"}</div>
+ <div style="padding:14px;border:1px solid #2b2b2b;border-radius:14px;margin-bottom:14px"><h3>Views</h3>
+ <label>Start time<input id="viewStart" type="datetime-local" value="${formatLocalDateTime(old.viewStart||now)}"></label>
+ <label>Check after (minutes)<input id="viewMinutes" type="number" min="1" value="${old.viewMinutes||15}"></label>
+ <label>Minimum views expected<input id="viewTarget" type="number" min="0" value="${old.viewTarget??100}"></label></div>
+ <div style="padding:14px;border:1px solid #2b2b2b;border-radius:14px;margin-bottom:14px"><h3>Likes</h3>
+ <label>Start time<input id="likeStart" type="datetime-local" value="${formatLocalDateTime(old.likeStart||now)}"></label>
+ <label>Monitoring period (hours)<input id="likeHours" type="number" min="1" value="${old.likeHours||6}"></label>
+ <label>Minimum likes expected<input id="likeTarget" type="number" min="0" value="${old.likeTarget??10}"></label></div>
+ <div style="font-size:12px;opacity:.65;margin-bottom:14px">Starting Views/Likes are captured when you save. You can edit the rules later.</div>
+ <button id="saveMonitor" class="primary" style="width:100%">Save Monitoring</button></div>`;
+ document.body.appendChild(o);o.querySelector("#closeMonitor").onclick=()=>o.remove();
+ o.querySelector("#saveMonitor").onclick=()=>{
+  const vs=new Date(o.querySelector("#viewStart").value).getTime(),ls=new Date(o.querySelector("#likeStart").value).getTime();
+  if(!Number.isFinite(vs)||!Number.isFinite(ls)){alert("Choose valid start times.");return;}
+  monitors[id]={videoId:id,title:video.title||video.video_description||"TikTok Video",accountUsername:account.username,
+   baselineViews:Number(video.view_count||0),baselineLikes:Number(video.like_count||0),viewStart:vs,
+   viewMinutes:Math.max(1,Number(o.querySelector("#viewMinutes").value||15)),viewTarget:Math.max(0,Number(o.querySelector("#viewTarget").value||0)),
+   likeStart:ls,likeHours:Math.max(1,Number(o.querySelector("#likeHours").value||6)),likeTarget:Math.max(0,Number(o.querySelector("#likeTarget").value||0)),updatedAt:Date.now()};
+  saveTikTokMonitors(monitors);o.remove();alert("Monitoring saved. You can edit it anytime.");
+ };
+};
+function monitorStatus(video){
+ const m=loadTikTokMonitors()[String(video.id)];if(!m)return null;const now=Date.now(),v=Number(video.view_count||0),l=Number(video.like_count||0);
+ const vd=m.viewStart+m.viewMinutes*60000,ld=m.likeStart+m.likeHours*3600000,vg=v-m.baselineViews,lg=l-m.baselineLikes;
+ return {m,view:vg>=m.viewTarget?"PASS":now>=vd?"ALERT":"WAIT",like:lg>=m.likeTarget?"PASS":now>=ld?"ALERT":"WAIT",viewGrowth:vg,likeGrowth:lg,viewDeadline:vd,likeDeadline:ld};
+}
 window.viewTikTokVideos = async function(index){
   const account = accounts[index];
   if(!account || account.platform !== "TikTok"){ alert("TikTok account not found"); return; }
@@ -294,6 +329,9 @@ window.viewTikTokVideos = async function(index){
         const link = v.share_url ? "<a href='" + v.share_url + "' target='_blank' rel='noopener' style='display:inline-block;margin-top:8px;'>Open on TikTok</a>" : "";
         const historyCount = (snapshots[String(v.id)] || []).length;
         const safeTitle = String(title).replace(/'/g, "&#39;").replace(/"/g, "&quot;");
+        const mon = monitorStatus(v);
+        const monitorButton = mon ? "<button class='primary small' onclick='openTikTokMonitor(" + JSON.stringify(v) + "," + JSON.stringify(account) + ")'>Edit Monitoring</button>" : "<button class='primary small' onclick='openTikTokMonitor(" + JSON.stringify(v) + "," + JSON.stringify(account) + ")'>Monitor Growth</button>";
+        const monitorInfo = mon ? "<div style='margin-top:10px;padding:9px;border-radius:10px;background:#191919;font-size:12px;line-height:1.7;'>Views: <b>" + mon.viewGrowth.toLocaleString() + "</b> / " + mon.m.viewTarget.toLocaleString() + " · " + mon.view + "<br>Likes: <b>" + mon.likeGrowth.toLocaleString() + "</b> / " + mon.m.likeTarget.toLocaleString() + " · " + mon.like + "</div>" : "";
 
         return "<article style='display:flex;gap:14px;padding:12px 0;border-bottom:1px solid #2b2b2b;'>" +
           cover +
@@ -305,7 +343,7 @@ window.viewTikTokVideos = async function(index){
           "</b><br>Shares: <b>" + Number(v.share_count || 0).toLocaleString() + "</b></div>" +
           "<div style='display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;'>" +
           "<button class='secondary small' onclick='showTikTokHistory(" + JSON.stringify(String(v.id)) + "," + JSON.stringify(String(title)) + ")'>History (" + historyCount + ")</button>" +
-          link +
+          monitorButton + link + monitorInfo +
           "</div></div></article>";
       }).join("");
     }catch(err){
