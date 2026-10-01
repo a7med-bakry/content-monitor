@@ -1,0 +1,18 @@
+{
+  "name": "content-monitor",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Content Monitor web app and Android app powered by Capacitor",
+  "scripts": {
+    "android:add": "cap add android",
+    "android:sync": "cap sync android",
+    "android:build": "cd android && ./gradlew assembleDebug"
+  },
+  "dependencies": {
+    "@capacitor/core": "^8.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.0.0",
+    "@capacitor/android": "^8.0.0"
+  }
+}
