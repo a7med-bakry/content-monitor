@@ -31,6 +31,12 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Prepare Capacitor web assets
+        run: |
+          rm -rf dist
+          mkdir -p dist
+          cp index.html styles.css app.js manifest.json service-worker.js dist/
+
       - name: Add Android platform
         run: npx cap add android
 
