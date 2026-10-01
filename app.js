@@ -7,6 +7,34 @@ const reels = document.querySelector("#reels");
 const modal = document.querySelector("#modal");
 const accountModal = document.querySelector("#accountModal");
 
+async function setupNotifications(){
+  if(!("Notification" in window)){
+    alert("Notifications are not supported on this browser.");
+    return;
+  }
+  if(!window.isSecureContext){
+    alert("Notifications require HTTPS.");
+    return;
+  }
+  try{
+    if("serviceWorker" in navigator){
+      await navigator.serviceWorker.register("./service-worker.js");
+    }
+    const permission=await Notification.requestPermission();
+    if(permission==="granted"){
+      localStorage.setItem("cm_notifications_enabled","1");
+      alert("Notifications enabled. The app is ready for push alerts.");
+    }else{
+      localStorage.removeItem("cm_notifications_enabled");
+      alert("Notifications are disabled. Allow them from your browser settings.");
+    }
+  }catch(e){
+    alert("Could not enable notifications: "+(e.message||e));
+  }
+}
+window.setupNotifications=setupNotifications;
+
+
 function saveAccounts(){ localStorage.setItem("cm_accounts", JSON.stringify(accounts)); }
 function saveReels(){ localStorage.setItem("cm_reels", JSON.stringify(reelsData)); }
 
@@ -92,6 +120,7 @@ function openAccountModal(){ accountModal.classList.remove("hidden"); }
 window.openAccountModal = openAccountModal;
 
 document.querySelector("#addBtn").onclick = openModal;
+document.querySelector("#notifyBtn").onclick = setupNotifications;
 document.querySelector("#newReel").onclick = openModal;
 document.querySelector("#closeBtn").onclick = closeModal;
 document.querySelector("#accountsBtn").addEventListener("click", showAccounts);
