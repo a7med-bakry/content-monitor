@@ -239,47 +239,88 @@ function formatLocalDateTime(ts){const d=new Date(ts),p=n=>String(n).padStart(2,
 
 window.openTikTokMonitor=function(video,account){
  const id=String(video.id),monitors=loadTikTokMonitors(),old=monitors[id]||{},now=Date.now(),o=document.createElement("div");
- o.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:11000;overflow:auto;padding:20px;";
- o.innerHTML=`<div style="max-width:650px;margin:30px auto;background:#111;color:#fff;border-radius:18px;padding:20px">
- <button id="closeMonitor" class="secondary" style="float:right">Close</button>
- <h2 style="margin:0 0 6px">How should this video grow?</h2>
- <div style="opacity:.7;font-size:13px;margin-bottom:18px">${video.title||video.video_description||"TikTok Video"}</div>
+ o.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.86);z-index:11000;overflow:auto;padding:14px;";
+ const title=String(video.title||video.video_description||"TikTok Video").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+ o.innerHTML=`<div style="max-width:680px;margin:18px auto;background:#111;color:#fff;border-radius:20px;padding:18px;box-shadow:0 20px 60px rgba(0,0,0,.45)">
+  <button id="closeMonitor" class="secondary" style="float:right">Close</button>
+  <h2 style="margin:0 0 5px">Growth Monitoring</h2>
+  <div style="opacity:.65;font-size:13px;margin-bottom:18px">${title}</div>
 
- <div style="padding:14px;border:1px solid #2b2b2b;border-radius:14px;margin-bottom:14px">
-  <h3 style="margin:0 0 12px">Views</h3>
-  <label>Start date & time<input id="viewStart" type="datetime-local" value="${formatLocalDateTime(old.viewStart||now)}"></label>
-  <label>Window duration (minutes)<input id="viewWindow" type="number" min="1" value="${old.viewWindow||15}"></label>
-  <label>Repeat every (minutes)<input id="viewRepeat" type="number" min="1" value="${old.viewRepeat||60}"></label>
-  <label>Minimum views per window<input id="viewTarget" type="number" min="0" value="${old.viewTarget??100}"></label>
-  <div style="font-size:12px;opacity:.65;margin-top:8px">Example: start 9:00, window 15 min, repeat every 60 min → check 9:00–9:15, then 10:00–10:15, then 11:00–11:15.</div>
- </div>
+  <div style="padding:15px;border:1px solid #343434;border-radius:16px;margin-bottom:14px;background:#151515">
+   <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px">
+    <div><h3 style="margin:0">Views</h3><div style="font-size:12px;opacity:.6;margin-top:3px">Independent repeating check</div></div>
+    <span style="font-size:12px;padding:5px 8px;border-radius:8px;background:#222">PER WINDOW</span>
+   </div>
+   <label>Start date & time<input id="viewStart" type="datetime-local" value="${formatLocalDateTime(old.viewStart||now)}"></label>
+   <div class="grid">
+    <label>Window duration (min)<input id="viewWindow" type="number" min="1" value="${old.viewWindow||15}"></label>
+    <label>Repeat every (min)<input id="viewRepeat" type="number" min="1" value="${old.viewRepeat||60}"></label>
+   </div>
+   <label>Minimum views gained per window<input id="viewTarget" type="number" min="0" value="${old.viewTarget??100}"></label>
+   <div id="viewPreview" style="margin-top:12px;padding:11px;border-radius:11px;background:#0d0d0d;border:1px solid #292929;font-size:13px;line-height:1.8"></div>
+  </div>
 
- <div style="padding:14px;border:1px solid #2b2b2b;border-radius:14px;margin-bottom:14px">
-  <h3 style="margin:0 0 12px">Likes</h3>
-  <label>Start date & time<input id="likeStart" type="datetime-local" value="${formatLocalDateTime(old.likeStart||now)}"></label>
-  <label>Window duration (minutes)<input id="likeWindow" type="number" min="1" value="${old.likeWindow||360}"></label>
-  <label>Repeat every (minutes)<input id="likeRepeat" type="number" min="1" value="${old.likeRepeat||360}"></label>
-  <label>Minimum likes per window<input id="likeTarget" type="number" min="0" value="${old.likeTarget??10}"></label>
-  <div style="font-size:12px;opacity:.65;margin-top:8px">Each window starts again after the repeat interval and checks the likes gained during that window.</div>
- </div>
+  <div style="padding:15px;border:1px solid #343434;border-radius:16px;margin-bottom:14px;background:#151515">
+   <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px">
+    <div><h3 style="margin:0">Likes</h3><div style="font-size:12px;opacity:.6;margin-top:3px">Independent repeating check</div></div>
+    <span style="font-size:12px;padding:5px 8px;border-radius:8px;background:#222">PER WINDOW</span>
+   </div>
+   <label>Start date & time<input id="likeStart" type="datetime-local" value="${formatLocalDateTime(old.likeStart||now)}"></label>
+   <div class="grid">
+    <label>Window duration (min)<input id="likeWindow" type="number" min="1" value="${old.likeWindow||360}"></label>
+    <label>Repeat every (min)<input id="likeRepeat" type="number" min="1" value="${old.likeRepeat||360}"></label>
+   </div>
+   <label>Minimum likes gained per window<input id="likeTarget" type="number" min="0" value="${old.likeTarget??10}"></label>
+   <div id="likePreview" style="margin-top:12px;padding:11px;border-radius:11px;background:#0d0d0d;border:1px solid #292929;font-size:13px;line-height:1.8"></div>
+  </div>
 
- <div style="font-size:12px;opacity:.65;margin-bottom:14px">Each window uses the stats at its own start as the baseline. You can edit these settings anytime.</div>
- <button id="saveMonitor" class="primary" style="width:100%">Save Monitoring</button></div>`;
+  <div style="padding:12px 13px;border-radius:12px;background:#1b1608;border:1px solid #4a3b16;font-size:12px;line-height:1.7;margin-bottom:14px">
+   <b>How it works:</b> every window has its own baseline at the exact window start. If the required growth is not reached by the window end, that window becomes <b>ALERT</b>. The next window starts only at the configured repeat time.
+  </div>
+  <button id="saveMonitor" class="primary" style="width:100%;font-size:15px;padding:13px">Save Monitoring</button>
+ </div>`;
+
  document.body.appendChild(o);
+
+ function preview(prefix,targetId){
+   const startValue=o.querySelector("#"+prefix+"Start").value;
+   const s=new Date(startValue).getTime();
+   const win=Math.max(1,Number(o.querySelector("#"+prefix+"Window").value||1));
+   const rep=Math.max(1,Number(o.querySelector("#"+prefix+"Repeat").value||1));
+   const target=Number(o.querySelector("#"+targetId).value||0);
+   const box=o.querySelector("#"+prefix+"Preview");
+   if(!Number.isFinite(s)){box.innerHTML="<b>Preview:</b> choose a valid start date/time.";return;}
+   const fmt=ts=>new Date(ts).toLocaleString([], {day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
+   const lines=[];
+   for(let i=0;i<3;i++){
+     const ws=s+i*rep*60000,we=ws+win*60000;
+     lines.push("<div><b>"+(i+1)+".</b> "+fmt(ws)+" → "+fmt(we)+" · target <b>"+target.toLocaleString()+"</b></div>");
+   }
+   box.innerHTML="<b>Next windows:</b>"+lines.join("")+"<div style='opacity:.55;margin-top:4px'>Window "+(win<60?win+" min":Math.floor(win/60)+"h"+(win%60?" "+win%60+"m":""))+" · repeats every "+(rep<60?rep+" min":Math.floor(rep/60)+"h"+(rep%60?" "+rep%60+"m":""))+"</div>";
+ }
+
+ function refreshPreviews(){
+   preview("view","viewTarget");
+   preview("like","likeTarget");
+ }
+ ["viewStart","viewWindow","viewRepeat","viewTarget","likeStart","likeWindow","likeRepeat","likeTarget"].forEach(x=>{
+   o.querySelector("#"+x).addEventListener("input",refreshPreviews);
+   o.querySelector("#"+x).addEventListener("change",refreshPreviews);
+ });
+ refreshPreviews();
+
  o.querySelector("#closeMonitor").onclick=()=>o.remove();
  o.querySelector("#saveMonitor").onclick=()=>{
   const vs=new Date(o.querySelector("#viewStart").value).getTime(),ls=new Date(o.querySelector("#likeStart").value).getTime();
-  if(!Number.isFinite(vs)||!Number.isFinite(ls)){alert("Choose valid start times.");return;}
+  const vw=Number(o.querySelector("#viewWindow").value),vr=Number(o.querySelector("#viewRepeat").value),vt=Number(o.querySelector("#viewTarget").value);
+  const lw=Number(o.querySelector("#likeWindow").value),lr=Number(o.querySelector("#likeRepeat").value),lt=Number(o.querySelector("#likeTarget").value);
+  if(!Number.isFinite(vs)||!Number.isFinite(ls)||vw<1||vr<1||lw<1||lr<1||vt<0||lt<0){alert("Please enter valid monitoring settings.");return;}
   monitors[id]={
    videoId:id,title:video.title||video.video_description||"TikTok Video",accountUsername:account.username,
-   viewStart:vs,viewWindow:Math.max(1,Number(o.querySelector("#viewWindow").value||15)),
-   viewRepeat:Math.max(1,Number(o.querySelector("#viewRepeat").value||60)),
-   viewTarget:Math.max(0,Number(o.querySelector("#viewTarget").value||0)),
-   likeStart:ls,likeWindow:Math.max(1,Number(o.querySelector("#likeWindow").value||360)),
-   likeRepeat:Math.max(1,Number(o.querySelector("#likeRepeat").value||360)),
-   likeTarget:Math.max(0,Number(o.querySelector("#likeTarget").value||0)),updatedAt:Date.now()
+   viewStart:vs,viewWindow:vw,viewRepeat:vr,viewTarget:vt,
+   likeStart:ls,likeWindow:lw,likeRepeat:lr,likeTarget:lt,updatedAt:Date.now()
   };
-  saveTikTokMonitors(monitors);o.remove();alert("Monitoring saved. You can edit it anytime.");
+  saveTikTokMonitors(monitors);o.remove();alert("Monitoring saved. Each window will use its own start baseline.");
  };
 };
 
