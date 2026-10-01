@@ -37,7 +37,7 @@ function showAccounts(){
   currentScreen = "accounts";
   document.querySelector("#section-head").textContent = "Accounts";
   if(!accounts.length){
-    reels.innerHTML = '<div class="empty">No Instagram accounts connected yet.<br><br><button class="primary" onclick="openAccountModal()">Connect Instagram</button></div>';
+    reels.innerHTML = '<div class="empty">No accounts connected yet.<br><br><button class="primary" onclick="openAccountModal()">Connect Instagram</button><br><br><button class="secondary" onclick="connectTikTok()">Connect TikTok</button></div>';
     return;
   }
   reels.innerHTML = accounts.map((a,i) => `
@@ -129,3 +129,21 @@ document.querySelector("#saveBtn").onclick = () => {
 };
 
 renderHome();
+
+function connectTikTok(){
+  window.location.href = "https://rwnesehhsblejmrbzzsu.supabase.co/functions/v1/tiktok-start";
+}
+
+window.connectTikTok = connectTikTok;
+
+(function handleTikTokResult(){
+  const p = new URLSearchParams(window.location.search);
+  if(p.get("tiktok") === "connected"){
+    alert("TikTok authorization completed.");
+    history.replaceState({}, document.title, window.location.pathname);
+    showAccounts();
+  } else if(p.get("tiktok") === "error"){
+    alert("TikTok authorization failed. Please try again.");
+    history.replaceState({}, document.title, window.location.pathname);
+  }
+})();
