@@ -1,4 +1,4 @@
-const CACHE_NAME = "content-monitor-v2";
+const CACHE_NAME = "content-monitor-v3";
 const ASSETS = ["./","./index.html","./styles.css","./app.js?v=12","./manifest.json"];
 
 self.addEventListener("install", event => {
@@ -26,8 +26,6 @@ self.addEventListener("push", event => {
   const title=data.title || "Content Monitor";
   const options={
     body:data.body || "A monitored clip needs your attention.",
-    icon:"./icon-192.png",
-    badge:"./icon-192.png",
     tag:data.tag || "content-monitor-alert",
     renotify:true,
     data:{url:data.url || "./"}
