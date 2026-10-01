@@ -42,7 +42,9 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
-      - name: Build web app
+      - name: Build web app for Android
+        env:
+          VITE_BASE: ./
         run: npm run build
 
       - name: Backup Firebase configuration
