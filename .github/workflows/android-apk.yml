@@ -13,7 +13,6 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -57,21 +56,29 @@ jobs:
           rm -rf android
           npx cap add android
           cp /tmp/google-services.json android/app/google-services.json
+
+      - name: Register TikTok deep link
+        run: |
           python3 - <<'PY'
-from pathlib import Path
-p = Path("android/app/src/main/AndroidManifest.xml")
-s = p.read_text()
-marker = '<intent-filter>\n                <action android:name="android.intent.action.VIEW" />\n                <category android:name="android.intent.category.DEFAULT" />\n                <category android:name="android.intent.category.BROWSABLE" />\n                <data android:scheme="com.contentmonitor.app" android:host="oauth" android:path="/tiktok" />\n            </intent-filter>'
-if 'android:scheme="com.contentmonitor.app"' not in s:
-    start = s.find("<activity")
-    if start < 0:
-        raise SystemExit("MainActivity declaration not found")
-    end = s.find(">", start)
-    if end < 0:
-        raise SystemExit("Activity opening tag not found")
-    s = s[:end+1] + "\n            " + marker.replace("\n", "\n            ") + s[end+1:]
-    p.write_text(s)
-PY
+          from pathlib import Path
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          s = p.read_text()
+          marker = '''<intent-filter>
+                  <action android:name="android.intent.action.VIEW" />
+                  <category android:name="android.intent.category.DEFAULT" />
+                  <category android:name="android.intent.category.BROWSABLE" />
+                  <data android:scheme="com.contentmonitor.app" android:host="oauth" android:path="/tiktok" />
+              </intent-filter>'''
+          if 'android:scheme="com.contentmonitor.app"' not in s:
+              start = s.find("<activity")
+              if start < 0:
+                  raise SystemExit("MainActivity declaration not found")
+              end = s.find(">", start)
+              if end < 0:
+                  raise SystemExit("Activity opening tag not found")
+              s = s[:end+1] + "\n            " + marker.replace("\n", "\n            ") + s[end+1:]
+              p.write_text(s)
+          PY
 
       - name: Configure Android
         run: |
