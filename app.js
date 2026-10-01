@@ -236,38 +236,81 @@ window.showTikTokHistory = function(videoId, title){
 function loadTikTokMonitors(){try{return JSON.parse(localStorage.getItem("cm_tiktok_monitors")||"{}");}catch(e){return {};}}
 function saveTikTokMonitors(data){localStorage.setItem("cm_tiktok_monitors",JSON.stringify(data));}
 function formatLocalDateTime(ts){const d=new Date(ts),p=n=>String(n).padStart(2,"0");return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours())+":"+p(d.getMinutes());}
+
 window.openTikTokMonitor=function(video,account){
  const id=String(video.id),monitors=loadTikTokMonitors(),old=monitors[id]||{},now=Date.now(),o=document.createElement("div");
  o.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:11000;overflow:auto;padding:20px;";
  o.innerHTML=`<div style="max-width:650px;margin:30px auto;background:#111;color:#fff;border-radius:18px;padding:20px">
- <button id="closeMonitor" class="secondary" style="float:right">Close</button><h2>How should this video grow?</h2>
+ <button id="closeMonitor" class="secondary" style="float:right">Close</button>
+ <h2 style="margin:0 0 6px">How should this video grow?</h2>
  <div style="opacity:.7;font-size:13px;margin-bottom:18px">${video.title||video.video_description||"TikTok Video"}</div>
- <div style="padding:14px;border:1px solid #2b2b2b;border-radius:14px;margin-bottom:14px"><h3>Views</h3>
- <label>Start time<input id="viewStart" type="datetime-local" value="${formatLocalDateTime(old.viewStart||now)}"></label>
- <label>Check after (minutes)<input id="viewMinutes" type="number" min="1" value="${old.viewMinutes||15}"></label>
- <label>Minimum views expected<input id="viewTarget" type="number" min="0" value="${old.viewTarget??100}"></label></div>
- <div style="padding:14px;border:1px solid #2b2b2b;border-radius:14px;margin-bottom:14px"><h3>Likes</h3>
- <label>Start time<input id="likeStart" type="datetime-local" value="${formatLocalDateTime(old.likeStart||now)}"></label>
- <label>Monitoring period (hours)<input id="likeHours" type="number" min="1" value="${old.likeHours||6}"></label>
- <label>Minimum likes expected<input id="likeTarget" type="number" min="0" value="${old.likeTarget??10}"></label></div>
- <div style="font-size:12px;opacity:.65;margin-bottom:14px">Starting Views/Likes are captured when you save. You can edit the rules later.</div>
+
+ <div style="padding:14px;border:1px solid #2b2b2b;border-radius:14px;margin-bottom:14px">
+  <h3 style="margin:0 0 12px">Views</h3>
+  <label>Start date & time<input id="viewStart" type="datetime-local" value="${formatLocalDateTime(old.viewStart||now)}"></label>
+  <label>Window duration (minutes)<input id="viewWindow" type="number" min="1" value="${old.viewWindow||15}"></label>
+  <label>Repeat every (minutes)<input id="viewRepeat" type="number" min="1" value="${old.viewRepeat||60}"></label>
+  <label>Minimum views per window<input id="viewTarget" type="number" min="0" value="${old.viewTarget??100}"></label>
+  <div style="font-size:12px;opacity:.65;margin-top:8px">Example: start 9:00, window 15 min, repeat every 60 min → check 9:00–9:15, then 10:00–10:15, then 11:00–11:15.</div>
+ </div>
+
+ <div style="padding:14px;border:1px solid #2b2b2b;border-radius:14px;margin-bottom:14px">
+  <h3 style="margin:0 0 12px">Likes</h3>
+  <label>Start date & time<input id="likeStart" type="datetime-local" value="${formatLocalDateTime(old.likeStart||now)}"></label>
+  <label>Window duration (minutes)<input id="likeWindow" type="number" min="1" value="${old.likeWindow||360}"></label>
+  <label>Repeat every (minutes)<input id="likeRepeat" type="number" min="1" value="${old.likeRepeat||360}"></label>
+  <label>Minimum likes per window<input id="likeTarget" type="number" min="0" value="${old.likeTarget??10}"></label>
+  <div style="font-size:12px;opacity:.65;margin-top:8px">Each window starts again after the repeat interval and checks the likes gained during that window.</div>
+ </div>
+
+ <div style="font-size:12px;opacity:.65;margin-bottom:14px">Each window uses the stats at its own start as the baseline. You can edit these settings anytime.</div>
  <button id="saveMonitor" class="primary" style="width:100%">Save Monitoring</button></div>`;
- document.body.appendChild(o);o.querySelector("#closeMonitor").onclick=()=>o.remove();
+ document.body.appendChild(o);
+ o.querySelector("#closeMonitor").onclick=()=>o.remove();
  o.querySelector("#saveMonitor").onclick=()=>{
   const vs=new Date(o.querySelector("#viewStart").value).getTime(),ls=new Date(o.querySelector("#likeStart").value).getTime();
   if(!Number.isFinite(vs)||!Number.isFinite(ls)){alert("Choose valid start times.");return;}
-  monitors[id]={videoId:id,title:video.title||video.video_description||"TikTok Video",accountUsername:account.username,
-   baselineViews:Number(video.view_count||0),baselineLikes:Number(video.like_count||0),viewStart:vs,
-   viewMinutes:Math.max(1,Number(o.querySelector("#viewMinutes").value||15)),viewTarget:Math.max(0,Number(o.querySelector("#viewTarget").value||0)),
-   likeStart:ls,likeHours:Math.max(1,Number(o.querySelector("#likeHours").value||6)),likeTarget:Math.max(0,Number(o.querySelector("#likeTarget").value||0)),updatedAt:Date.now()};
+  monitors[id]={
+   videoId:id,title:video.title||video.video_description||"TikTok Video",accountUsername:account.username,
+   viewStart:vs,viewWindow:Math.max(1,Number(o.querySelector("#viewWindow").value||15)),
+   viewRepeat:Math.max(1,Number(o.querySelector("#viewRepeat").value||60)),
+   viewTarget:Math.max(0,Number(o.querySelector("#viewTarget").value||0)),
+   likeStart:ls,likeWindow:Math.max(1,Number(o.querySelector("#likeWindow").value||360)),
+   likeRepeat:Math.max(1,Number(o.querySelector("#likeRepeat").value||360)),
+   likeTarget:Math.max(0,Number(o.querySelector("#likeTarget").value||0)),updatedAt:Date.now()
+  };
   saveTikTokMonitors(monitors);o.remove();alert("Monitoring saved. You can edit it anytime.");
  };
 };
-function monitorStatus(video){
- const m=loadTikTokMonitors()[String(video.id)];if(!m)return null;const now=Date.now(),v=Number(video.view_count||0),l=Number(video.like_count||0);
- const vd=m.viewStart+m.viewMinutes*60000,ld=m.likeStart+m.likeHours*3600000,vg=v-m.baselineViews,lg=l-m.baselineLikes;
- return {m,view:vg>=m.viewTarget?"PASS":now>=vd?"ALERT":"WAIT",like:lg>=m.likeTarget?"PASS":now>=ld?"ALERT":"WAIT",viewGrowth:vg,likeGrowth:lg,viewDeadline:vd,likeDeadline:ld};
+
+function getGrowthWindow(m,type,now){
+ const prefix=type==="views"?"view":"like",start=Number(m[prefix+"Start"]),windowMin=Number(m[prefix+"Window"]),repeatMin=Number(m[prefix+"Repeat"]);
+ if(!start||!windowMin||!repeatMin||now<start)return {state:"WAIT",growth:0,target:Number(m[prefix+"Target"]||0),windowStart:start,windowEnd:start+windowMin*60000};
+ const elapsed=now-start,cycle=Math.floor(elapsed/(repeatMin*60000)),windowStart=start+cycle*repeatMin*60000,windowEnd=windowStart+windowMin*60000;
+ if(elapsed>=cycle*repeatMin*60000+windowMin*60000)return {state:"ALERT",growth:0,target:Number(m[prefix+"Target"]||0),windowStart,windowEnd};
+ return {state:"ACTIVE",growth:0,target:Number(m[prefix+"Target"]||0),windowStart,windowEnd};
 }
+
+function monitorStatus(video){
+ const m=loadTikTokMonitors()[String(video.id)];if(!m)return null;
+ const now=Date.now(),views=Number(video.view_count||0),likes=Number(video.like_count||0);
+ const all=loadTikTokSnapshots(),history=all[String(video.id)]||[];
+ function calc(type,current){
+  const w=getGrowthWindow(m,type,now),prefix=type==="views"?"view":"like";
+  if(w.state==="WAIT")return {...w,growth:0};
+  let baseline=current;
+  for(const s of history){
+   const t=Number(s.capturedAt);
+   if(t<=w.windowStart){baseline=Number(s[type==="views"?"views":"likes"]||current);break;}
+  }
+  const growth=current-baseline;
+  if(w.state==="ACTIVE")w.state=growth>=w.target?"PASS":"ACTIVE";
+  else w.state=growth>=w.target?"PASS":"ALERT";
+  w.growth=growth;return w;
+ }
+ return {m,views:calc("views",views),likes:calc("likes",likes)};
+}
+
 window.viewTikTokVideos = async function(index){
   const account = accounts[index];
   if(!account || account.platform !== "TikTok"){ alert("TikTok account not found"); return; }
