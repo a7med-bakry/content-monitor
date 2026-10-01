@@ -1,6 +1,7 @@
 import { Capacitor } from "@capacitor/core";
 import { App } from "@capacitor/app";
 import { PushNotifications } from "@capacitor/push-notifications";
+import { Browser } from "@capacitor/browser";
 
 const accounts = JSON.parse(localStorage.getItem("cm_accounts") || "[]");
 const SUPABASE_URL = "https://rwnesehhsblejmrbzzsu.supabase.co";
@@ -260,30 +261,27 @@ document.querySelector("#notifyBtn").onclick = setupNotifications;
 document.querySelector("#newReel").onclick = openModal;
 document.querySelector("#closeBtn").onclick = closeModal;
 document.querySelector("#accountsBtn").addEventListener("click", showAccounts);
-document.querySelector(".bottom button:first-child").addEventListener("click", ()=>{
 // Native Android deep-link bridge for TikTok OAuth.
-// The server completes OAuth first, then returns to this app through the custom scheme.
+// Register this at app startup, not on a button click.
 if (Capacitor.isNativePlatform()) {
   const handleNativeUrl = (rawUrl) => {
     try {
       const u = new URL(rawUrl);
       if (u.searchParams.get("tiktok")) {
         const qs = u.searchParams.toString();
-        history.replaceState({}, document.title, window.location.pathname + "?" + qs);
-        window.location.reload();
+        history.replaceState({}, document.title, window.location.pathname + (qs ? "?" + qs : ""));
+        window.dispatchEvent(new Event("tiktok-oauth-return"));
       }
     } catch (e) {
       console.warn("Native URL handling failed", e);
     }
   };
-
   App.addListener("appUrlOpen", ({ url }) => handleNativeUrl(url));
   App.getLaunchUrl().then(result => {
     if (result?.url) handleNativeUrl(result.url);
   }).catch(() => {});
 }
-
-refreshRemoteSnapshots().finally(renderHome);});
+refreshRemoteSnapshots().finally(renderHome);
 document.querySelector("#accountClose").addEventListener("click", () => accountModal.classList.add("hidden"));
 
 document.querySelector("#connectIg").addEventListener("click", () => {
@@ -704,9 +702,17 @@ window.viewTikTokVideos = async function(index){
 
   loadVideos();
 };
-function connectTikTok(){
+async function connectTikTok(){
   const native = Capacitor.isNativePlatform();
   const url = "https://rwnesehhsblejmrbzzsu.supabase.co/functions/v1/tiktok-start" + (native ? "?return=app" : "");
+  if (native) {
+    try {
+      await Browser.open({ url, presentationStyle: "fullscreen" });
+      return;
+    } catch (e) {
+      console.warn("In-app TikTok OAuth browser failed, falling back:", e);
+    }
+  }
   window.location.href = url;
 }
 window.connectTikTok = connectTikTok;
