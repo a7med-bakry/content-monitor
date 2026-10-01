@@ -56,7 +56,7 @@ function showAccounts(){
       </div>
       <div class="expected">${isTikTok ? "TikTok profile connected successfully." : `Test Reel: <b>${a.testReel ? "Added" : "Not added"}</b>`}</div>
       <div class="account-actions">
-        ${isTikTok ? "" : `<button class="primary small" onclick="addTestReel(${i})">${a.testReel ? "Change Test Reel" : "Add Test Reel"}</button>`}
+        ${isTikTok ? `<button class="primary small" onclick="viewTikTokVideos(${i})">View Videos</button>` : `<button class="primary small" onclick="addTestReel(${i})">${a.testReel ? "Change Test Reel" : "Add Test Reel"}</button>`}
         <button class="secondary" onclick="removeAccount(${i})">Remove</button>
       </div>
     </article>`;
@@ -138,6 +138,41 @@ document.querySelector("#saveBtn").onclick = () => {
   document.querySelector("#url").value = "";
   closeModal();
   renderHome();
+};
+
+
+window.viewTikTokVideos = async function(index){
+  const account = accounts[index];
+  if(!account || account.platform !== "TikTok"){ alert("TikTok account not found"); return; }
+  const openId = account.openId || "";
+  if(!openId){ alert("This TikTok account is missing its open_id. Reconnect TikTok first."); return; }
+
+  const overlay = document.createElement("div");
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;overflow:auto;padding:20px;";
+  overlay.innerHTML = "<div style='max-width:760px;margin:30px auto;background:#111;color:#fff;border-radius:18px;padding:18px;'><div style='display:flex;justify-content:space-between;align-items:center;gap:12px;'><h2 style='margin:0;'>" + account.username + " · Videos</h2><button id='closeTikTokVideos' class='secondary'>Close</button></div><div id='tiktokVideoBody' style='margin-top:16px;'>Loading videos...</div></div>";
+  document.body.appendChild(overlay);
+  overlay.querySelector("#closeTikTokVideos").onclick = () => overlay.remove();
+
+  try{
+    const res = await fetch("https://rwnesehhsblejmrbzzsu.supabase.co/functions/v1/tiktok-videos", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({open_id:openId})
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data?.details?.message || data?.error || "Failed to load TikTok videos");
+    const videos = data.videos || [];
+    const body = overlay.querySelector("#tiktokVideoBody");
+    if(!videos.length){ body.innerHTML = "<div class='empty'>No public videos returned by TikTok.</div>"; return; }
+    body.innerHTML = videos.map(v => {
+      const title = v.title || v.video_description || "TikTok Video";
+      const cover = v.cover_image_url ? "<img src='" + v.cover_image_url + "' alt='' style='width:110px;height:150px;object-fit:cover;border-radius:10px;background:#222;'>" : "";
+      const link = v.share_url ? "<a href='" + v.share_url + "' target='_blank' rel='noopener' style='display:inline-block;margin-top:8px;'>Open on TikTok</a>" : "";
+      return "<article style='display:flex;gap:14px;padding:12px 0;border-bottom:1px solid #2b2b2b;'>" + cover + "<div style='flex:1;min-width:0;'><div style='font-weight:700;margin-bottom:8px;'>" + title + "</div><div style='font-size:14px;line-height:1.8;'>Views: <b>" + Number(v.view_count || 0).toLocaleString() + "</b><br>Likes: <b>" + Number(v.like_count || 0).toLocaleString() + "</b><br>Comments: <b>" + Number(v.comment_count || 0).toLocaleString() + "</b><br>Shares: <b>" + Number(v.share_count || 0).toLocaleString() + "</b></div>" + link + "</div></article>";
+    }).join("");
+  }catch(err){
+    overlay.querySelector("#tiktokVideoBody").innerHTML = "<div class='empty'>Failed to load videos.<br><br>" + String(err.message || err) + "</div>";
+  }
 };
 
 function connectTikTok(){
