@@ -1,6 +1,3 @@
-import { Capacitor } from "@capacitor/core";
-import { PushNotifications } from "@capacitor/push-notifications";
-
 const SUPABASE_URL="https://rwnesehhsblejmrbzzsu.supabase.co";
 const SUPABASE_KEY="sb_publishable_3vG6klw0_89fiTeXRcFPdg_EmtjhDWi";
 const API=SUPABASE_URL+"/functions/v1/reel-api";
@@ -118,6 +115,15 @@ window.showHistory=showHistory;
 
 function urlBase64ToUint8Array(s){const p="=".repeat((4-s.length%4)%4),b=(s+p).replace(/-/g,"+").replace(/_/g,"/"),r=atob(b);return Uint8Array.from([...r].map(c=>c.charCodeAt(0)));}
 async function setupNotifications(){
+  let Capacitor, PushNotifications;
+  try{
+    const cap=await import("@capacitor/core");
+    const push=await import("@capacitor/push-notifications");
+    Capacitor=cap.Capacitor;
+    PushNotifications=push.PushNotifications;
+  }catch(e){
+    Capacitor={isNativePlatform:()=>false};
+  }
   if(Capacitor.isNativePlatform()){
     try{
       let p=await PushNotifications.checkPermissions();if(p.receive!=="granted")p=await PushNotifications.requestPermissions();if(p.receive!=="granted")return;
