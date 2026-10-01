@@ -8,7 +8,7 @@ const modal=document.querySelector("#modal");
 const settingsModal=document.querySelector("#settingsModal");
 
 function api(action,body={}) {
-  return fetch(API,{method:"POST",headers:{"Content-Type":"text/plain","apikey":SUPABASE_KEY},body:JSON.stringify({action,...body})});
+  return fetch(API,{method:"POST",headers:{"Content-Type":"text/plain"},body:JSON.stringify({action,...body})});
 }
 function fmt(ts){
   if(!ts)return "—";
