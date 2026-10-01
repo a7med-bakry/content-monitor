@@ -2,7 +2,7 @@ const SUPABASE_URL="https://rwnesehhsblejmrbzzsu.supabase.co";
 const SUPABASE_KEY="sb_publishable_3vG6klw0_89fiTeXRcFPdg_EmtjhDWi";
 const API=SUPABASE_URL+"/functions/v1/reel-api";
 const VAPID_PUBLIC_KEY="BI4nAWrPOT2kwAyN5LkddZ7plyg79egQg33pZrV6EuFE6SJ8ORy_2Da0Fbk7Lu7VHOp6uDXELzkhGLJcYBk9uOo";
-let reelsData=[];
+let reelsData=[];\nlet lastAlertId=Number(localStorage.getItem("lastAlertId")||0);
 const reels=document.querySelector("#reels");
 const modal=document.querySelector("#modal");
 const settingsModal=document.querySelector("#settingsModal");
@@ -30,10 +30,24 @@ function state(r){
   if(now>=e)return ["ENDED","alert"];
   return ["MONITORED","ok"];
 }
+function detectPlatform(url){
+  const u=String(url||"").toLowerCase();
+  if(/(^|\.)tiktok\.com\//.test(u)) return "tiktok";
+  if(/(^|\.)instagram\.com\//.test(u)) return "instagram";
+  return "";
+}
+function platformName(p){return p==="tiktok"?"TikTok":p==="instagram"?"Instagram":"";}
+function updateRulePreview(){
+  const d=Number(document.querySelector("#alertDelay").value||15);
+  const rep=Number(document.querySelector("#alertRepeat").value||60);
+  const min=Number(document.querySelector("#minViews").value||100);
+  const repeatText=rep<60?rep+" min":rep===60?"60 min":(rep/60)+" hr";
+  document.querySelector("#rulePreview").textContent="Check "+d+" min after each "+repeatText+" window. Minimum increase: "+min.toLocaleString()+" views.";
+}
 function updateSummary(){
   document.querySelector("#total").textContent=reelsData.length;
   document.querySelector("#normal").textContent=reelsData.filter(r=>state(r)[0]!=="ENDED").length;
-  document.querySelector("#alerts").textContent=reelsData.filter(r=>state(r)[0]==="ENDED").length;
+  document.querySelector("#alerts").textContent=0;
 }
 async function loadReels(){
   try{
@@ -51,7 +65,7 @@ function render(){
   reels.innerHTML=reelsData.map(r=>{
     const [st,cls]=state(r);
     const title=esc(r.title||"Reel");
-    const platform=String(r.platform||"").toUpperCase();
+    const platform=platformName(r.platform)||String(r.platform||"").toUpperCase();
     return "<article class='card'>"+
       "<div class='card-top'><div><div class='title'>"+title+"</div><div class='platform'>"+platform+"</div></div><span class='status "+cls+"'>"+st+"</span></div>"+
       "<div class='metrics'><div class='metric'><span>Interval</span><b>"+Number(r.snapshot_interval_minutes||15)+"m</b></div><div class='metric'><span>Last snapshot</span><b style='font-size:13px'>"+esc(fmt(r.last_snapshot_at))+"</b></div></div>"+
@@ -61,29 +75,30 @@ function render(){
   }).join("");
 }
 async function addReel(){
-  const platform=document.querySelector("#platform").value;
   const url=document.querySelector("#url").value.trim();
+  const platform=detectPlatform(url);
   const title=document.querySelector("#title").value.trim()||"New Reel";
   const startValue=document.querySelector("#start").value;
   const endValue=document.querySelector("#end").value;
-  const interval=Number(document.querySelector("#interval").value);
-  if(!url){alert("Paste the Reel URL first");return;}
+  const alertDelay=Number(document.querySelector("#alertDelay").value||15);
+  const alertRepeat=Number(document.querySelector("#alertRepeat").value||60);
+  const minViews=Number(document.querySelector("#minViews").value||100);
+  if(!url){alert("Paste the Reel/Video URL first");return;}
+  if(!platform){alert("Use an Instagram or TikTok link.");return;}
+  if(minViews<1){alert("Minimum views increase must be at least 1.");return;}
   const start=new Date(startValue),end=new Date(endValue);
   if(!Number.isFinite(start.getTime())||!Number.isFinite(end.getTime())||end<=start){alert("Choose a valid start and end time.");return;}
   const btn=document.querySelector("#saveBtn");
   btn.disabled=true;btn.textContent="Adding Reel + first snapshot...";
   try{
-    const r=await api("add",{platform,url,title,platform_media_id:mediaId(url,platform),monitor_start_at:start.toISOString(),monitor_end_at:end.toISOString(),snapshot_interval_minutes:interval});
+    const r=await api("add",{platform,url,title,platform_media_id:mediaId(url,platform),monitor_start_at:start.toISOString(),monitor_end_at:end.toISOString(),alert_delay_minutes:alertDelay,alert_repeat_minutes:alertRepeat,alert_min_views_increase:minViews});
     const d=await r.json();
     if(!r.ok)throw new Error(d.error||"Failed to add Reel");
-    closeModal();
-    await loadReels();
+    closeModal(); await loadReels();
     const first=d.first_snapshot;
     if(first?.ok){
-      alert("Reel added successfully. First snapshot captured:\n\nViews: "+Number(first.metrics?.views||0).toLocaleString()+"\nLikes: "+Number(first.metrics?.likes||0).toLocaleString());
-    }else{
-      alert("Reel added, but the first snapshot could not be read yet. The Supabase collector will retry on the next scheduled check.");
-    }
+      alert("Reel added successfully. First snapshot captured:\n\nViews: "+Number(first.data?.metrics?.views||first.metrics?.views||0).toLocaleString()+"\nLikes: "+Number(first.data?.metrics?.likes||first.metrics?.likes||0).toLocaleString());
+    }else alert("Reel added, but the first snapshot could not be read yet. The Supabase collector will retry on the next scheduled check.");
   }catch(e){alert("Could not add Reel: "+(e.message||e));}
   finally{btn.disabled=false;btn.textContent="Add Reel & Take First Snapshot";}
 }
@@ -91,6 +106,10 @@ function openModal(){
   const now=Date.now(),end=now+24*60*60*1000;
   document.querySelector("#start").value=localInput(now);
   document.querySelector("#end").value=localInput(end);
+  document.querySelector("#alertDelay").value="15";
+  document.querySelector("#alertRepeat").value="60";
+  document.querySelector("#minViews").value="100";
+  updateRulePreview();
   modal.classList.remove("hidden");
 }
 function closeModal(){modal.classList.add("hidden");document.querySelector("#url").value="";document.querySelector("#title").value="";}
@@ -148,7 +167,7 @@ async function setupNotifications(){
 document.querySelector("#addBtn").onclick=openModal;
 document.querySelector("#newReel").onclick=openModal;
 document.querySelector("#closeBtn").onclick=closeModal;
-document.querySelector("#saveBtn").onclick=addReel;
+document.querySelector("#saveBtn").onclick=addReel;\ndocument.querySelector("#url").addEventListener("input",()=>{const p=detectPlatform(document.querySelector("#url").value);const el=document.querySelector("#platformDetected");el.classList.toggle("hidden",!p);el.textContent=p==="tiktok"?"✓ TikTok detected":"✓ Instagram detected";});\ndocument.querySelector("#alertDelay").onchange=updateRulePreview;\ndocument.querySelector("#alertRepeat").onchange=updateRulePreview;\ndocument.querySelector("#minViews").oninput=updateRulePreview;
 document.querySelector("#refreshBtn").onclick=loadReels;
 document.querySelector("#homeBtn").onclick=loadReels;
 document.querySelector("#settingsBtn").onclick=()=>settingsModal.classList.remove("hidden");
