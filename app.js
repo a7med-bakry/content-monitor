@@ -1,3 +1,7 @@
+import { Capacitor } from "@capacitor/core";
+import { App } from "@capacitor/app";
+import { PushNotifications } from "@capacitor/push-notifications";
+
 const accounts = JSON.parse(localStorage.getItem("cm_accounts") || "[]");
 const SUPABASE_URL = "https://rwnesehhsblejmrbzzsu.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_3vG6klw0_89fiTeXRcFPdg_EmtjhDWi";
@@ -13,6 +17,59 @@ const accountModal = document.querySelector("#accountModal");
 function urlBase64ToUint8Array(base64String){const padding="=".repeat((4-base64String.length%4)%4),base64=(base64String+padding).replace(/-/g,"+").replace(/_/g,"/");const raw=atob(base64);return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)));}
 
 async function setupNotifications(){
+  if (Capacitor.isNativePlatform()) {
+    try {
+      let perm = await PushNotifications.checkPermissions();
+      if (perm.receive !== "granted") perm = await PushNotifications.requestPermissions();
+      if (perm.receive !== "granted") {
+        alert("Notifications permission was not granted.");
+        return;
+      }
+
+      await PushNotifications.createChannel({
+        id: "metric-alerts",
+        name: "Metric Alerts",
+        description: "Views and Likes drop alerts",
+        importance: 5,
+        visibility: 1,
+        sound: "default"
+      }).catch(() => {});
+
+      await PushNotifications.addListener("registration", async ({ value }) => {
+        try {
+          await fetch(SUPABASE_URL + "/functions/v1/tiktok-snapshots", {
+            method: "POST",
+            headers: {"Content-Type":"application/json", "apikey": SUPABASE_PUBLISHABLE_KEY},
+            body: JSON.stringify({action:"native_subscribe", token:value, platform:"android"})
+          });
+          localStorage.setItem("cm_native_push_token", value);
+        } catch (e) {
+          console.warn("Native push token save failed", e);
+        }
+      });
+
+      await PushNotifications.addListener("registrationError", e => {
+        console.error("Native push registration failed", e);
+      });
+
+      await PushNotifications.addListener("pushNotificationReceived", notification => {
+        console.log("Metric alert received", notification);
+      });
+
+      await PushNotifications.addListener("pushNotificationActionPerformed", action => {
+        console.log("Metric alert opened", action);
+      });
+
+      await PushNotifications.register();
+      alert("Native notifications are ready.");
+      return;
+    } catch (e) {
+      console.error("Native push setup failed", e);
+      alert("Could not enable Android notifications: " + (e?.message || e));
+      return;
+    }
+  }
+
   if(!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)){
     alert("Push notifications are not supported in this browser.");
     return;
@@ -203,7 +260,30 @@ document.querySelector("#notifyBtn").onclick = setupNotifications;
 document.querySelector("#newReel").onclick = openModal;
 document.querySelector("#closeBtn").onclick = closeModal;
 document.querySelector("#accountsBtn").addEventListener("click", showAccounts);
-document.querySelector(".bottom button:first-child").addEventListener("click", ()=>{refreshRemoteSnapshots().finally(renderHome);});
+document.querySelector(".bottom button:first-child").addEventListener("click", ()=>{
+// Native Android deep-link bridge for TikTok OAuth.
+// The server completes OAuth first, then returns to this app through the custom scheme.
+if (Capacitor.isNativePlatform()) {
+  const handleNativeUrl = (rawUrl) => {
+    try {
+      const u = new URL(rawUrl);
+      if (u.searchParams.get("tiktok")) {
+        const qs = u.searchParams.toString();
+        history.replaceState({}, document.title, window.location.pathname + "?" + qs);
+        window.location.reload();
+      }
+    } catch (e) {
+      console.warn("Native URL handling failed", e);
+    }
+  };
+
+  App.addListener("appUrlOpen", ({ url }) => handleNativeUrl(url));
+  App.getLaunchUrl().then(result => {
+    if (result?.url) handleNativeUrl(result.url);
+  }).catch(() => {});
+}
+
+refreshRemoteSnapshots().finally(renderHome);});
 document.querySelector("#accountClose").addEventListener("click", () => accountModal.classList.add("hidden"));
 
 document.querySelector("#connectIg").addEventListener("click", () => {
@@ -625,7 +705,9 @@ window.viewTikTokVideos = async function(index){
   loadVideos();
 };
 function connectTikTok(){
-  window.location.href = "https://rwnesehhsblejmrbzzsu.supabase.co/functions/v1/tiktok-start";
+  const native = Capacitor.isNativePlatform();
+  const url = "https://rwnesehhsblejmrbzzsu.supabase.co/functions/v1/tiktok-start" + (native ? "?return=app" : "");
+  window.location.href = url;
 }
 window.connectTikTok = connectTikTok;
 
