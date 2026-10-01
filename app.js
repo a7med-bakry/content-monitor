@@ -1,4 +1,7 @@
 const accounts = JSON.parse(localStorage.getItem("cm_accounts") || "[]");
+const SUPABASE_URL = "https://rwnesehhsblejmrbzzsu.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_3vG6klw0_89fiTeXRcFPdg_EmtjhDWi";
+const VAPID_PUBLIC_KEY = "BI4nAWrPOT2kwAyN5LkddZ7plyg79egQg33pZrV6EuFE6SJ8ORy_2Da0Fbk7Lu7VHOp6uDXELzkhGLJcYBk9uOo";
 let reelsData = JSON.parse(localStorage.getItem("cm_reels") || "[]");
 let currentScreen = "home";
 let testAccountIndex = null;
@@ -6,6 +9,8 @@ let testAccountIndex = null;
 const reels = document.querySelector("#reels");
 const modal = document.querySelector("#modal");
 const accountModal = document.querySelector("#accountModal");
+
+function urlBase64ToUint8Array(base64String){const padding="=".repeat((4-base64String.length%4)%4),base64=(base64String+padding).replace(/-/g,"+").replace(/_/g,"/");const raw=atob(base64);return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)));}
 
 async function setupNotifications(){
   if(!("Notification" in window)){
@@ -22,8 +27,13 @@ async function setupNotifications(){
     }
     const permission=await Notification.requestPermission();
     if(permission==="granted"){
+      const reg=await navigator.serviceWorker.ready;
+      let sub=await reg.pushManager.getSubscription();
+      if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY)});
+      const save=await fetch(SUPABASE_URL+"/functions/v1/tiktok-snapshots",{method:"POST",headers:{"Content-Type":"application/json","apikey":SUPABASE_PUBLISHABLE_KEY},body:JSON.stringify({action:"subscribe",subscription:sub.toJSON()})});
+      if(!save.ok) throw new Error("Push subscription could not be saved");
       localStorage.setItem("cm_notifications_enabled","1");
-      alert("Notifications enabled. The app is ready for push alerts.");
+      alert("Notifications enabled. Push alerts are ready.");
     }else{
       localStorage.removeItem("cm_notifications_enabled");
       alert("Notifications are disabled. Allow them from your browser settings.");
@@ -54,6 +64,14 @@ function getHomeGrowth(videoId){
     return {views:Number(b.views||0)-Number(a.views||0),likes:Number(b.likes||0)-Number(a.likes||0),at:b.capturedAt};
   }catch(e){return {views:0,likes:0,at:null};}
 }
+async function refreshRemoteSnapshots(){
+  try{
+    const res=await fetch(SUPABASE_URL+"/functions/v1/tiktok-snapshots",{headers:{apikey:SUPABASE_PUBLISHABLE_KEY}});
+    const data=await res.json();
+    if(res.ok && data.snapshots) saveTikTokSnapshots(data.snapshots);
+  }catch(e){ console.warn("Remote snapshot sync failed",e); }
+}
+
 function renderHome(){
   currentScreen = "home";
   document.querySelector("#section-head").textContent = "Reels";
@@ -124,7 +142,7 @@ document.querySelector("#notifyBtn").onclick = setupNotifications;
 document.querySelector("#newReel").onclick = openModal;
 document.querySelector("#closeBtn").onclick = closeModal;
 document.querySelector("#accountsBtn").addEventListener("click", showAccounts);
-document.querySelector(".bottom button:first-child").addEventListener("click", renderHome);
+document.querySelector(".bottom button:first-child").addEventListener("click", ()=>{refreshRemoteSnapshots().finally(renderHome);});
 document.querySelector("#accountClose").addEventListener("click", () => accountModal.classList.add("hidden"));
 
 document.querySelector("#connectIg").addEventListener("click", () => {
@@ -189,7 +207,7 @@ document.querySelector("#saveBtn").onclick = () => {
   saveReels();
   document.querySelector("#url").value = "";
   closeModal();
-  renderHome();
+  refreshRemoteSnapshots().finally(renderHome);
 };
 
 
@@ -403,6 +421,7 @@ window.openTikTokMonitor=function(video,account){
    likeStart:ls,likeWindow:lw,likeRepeat:lr,likeTarget:lt,updatedAt:Date.now()
   };
   saveTikTokMonitors(monitors);
+  fetch(SUPABASE_URL+"/functions/v1/tiktok-snapshots",{method:"POST",headers:{"Content-Type":"application/json","apikey":SUPABASE_PUBLISHABLE_KEY},body:JSON.stringify({action:"monitor",open_id:account.openId,platform_media_id:id,url:video.share_url||"",title:video.title||video.video_description||"TikTok Video"})}).then(async r=>{if(!r.ok){const x=await r.json().catch(()=>({}));throw new Error(x.error||"Monitor save failed");}}).catch(e=>alert("Monitoring saved locally, but server monitoring failed: "+e.message));
   const existingReel = reelsData.findIndex(r => r.platform === "TikTok" && String(r.videoId) === id);
   const card = {
     videoId:id,
@@ -569,4 +588,4 @@ window.connectTikTok = connectTikTok;
   }
 })();
 
-renderHome();
+refreshRemoteSnapshots().finally(renderHome);
