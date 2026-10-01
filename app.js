@@ -10,20 +10,43 @@ const accountModal = document.querySelector("#accountModal");
 function saveAccounts(){ localStorage.setItem("cm_accounts", JSON.stringify(accounts)); }
 function saveReels(){ localStorage.setItem("cm_reels", JSON.stringify(reelsData)); }
 
+function getHomeSnapshot(videoId){
+  try{
+    const data=JSON.parse(localStorage.getItem("cm_tiktok_snapshots")||"{}");
+    const h=data[String(videoId)]||[];
+    return h.length?h[h.length-1]:null;
+  }catch(e){return null;}
+}
+function getHomeGrowth(videoId){
+  try{
+    const data=JSON.parse(localStorage.getItem("cm_tiktok_snapshots")||"{}");
+    const h=data[String(videoId)]||[];
+    if(h.length<2)return {views:0,likes:0,at:null};
+    const a=h[h.length-2],b=h[h.length-1];
+    return {views:Number(b.views||0)-Number(a.views||0),likes:Number(b.likes||0)-Number(a.likes||0),at:b.capturedAt};
+  }catch(e){return {views:0,likes:0,at:null};}
+}
 function renderHome(){
   currentScreen = "home";
   document.querySelector("#section-head").textContent = "Reels";
   const all = reelsData;
-  reels.innerHTML = all.length ? all.map(r => `
-    <article class="card">
-      <div class="card-top"><div><div class="title">${r.name}</div><div class="platform">${r.platform}</div></div>
-      <span class="status ${r.status}">${r.status==="ok"?"NORMAL":"ALERT"}</span></div>
+  reels.innerHTML = all.length ? all.map(r => {
+    const snap=r.platform==="TikTok"&&r.videoId?getHomeSnapshot(r.videoId):null;
+    const growth=r.platform==="TikTok"&&r.videoId?getHomeGrowth(r.videoId):{views:r.viewDelta||0,likes:r.likeDelta||0};
+    const views=snap?Number(snap.views||0):Number(r.views||0);
+    const likes=snap?Number(snap.likes||0):Number(r.likes||0);
+    const monitor=r.platform==="TikTok"&&r.videoId&&loadTikTokMonitors()[String(r.videoId)];
+    const last=snap&&snap.capturedAt?" · Last snapshot "+formatSnapshotTime(snap.capturedAt):"";
+    return `<article class="card">
+      <div class="card-top"><div><div class="title">${r.name}</div><div class="platform">${r.platform}${r.accountUsername?" · "+r.accountUsername:""}</div></div>
+      <span class="status ${monitor?(r.status==="alert"?"alert":"ok"):r.status}">${monitor?(r.status==="alert"?"ALERT":"MONITORED"):(r.status==="ok"?"NORMAL":"ALERT")}</span></div>
       <div class="metrics">
-        <div class="metric"><span>Views</span><b>${Number(r.views).toLocaleString()}</b><small> +${r.viewDelta}/h</small></div>
-        <div class="metric"><span>Likes</span><b>${Number(r.likes).toLocaleString()}</b><small> +${r.likeDelta}</small></div>
+        <div class="metric"><span>Views</span><b>${views.toLocaleString()}</b><small> +${growth.views.toLocaleString()} / 5m</small></div>
+        <div class="metric"><span>Likes</span><b>${likes.toLocaleString()}</b><small> +${growth.likes.toLocaleString()} / 5m</small></div>
       </div>
-      <div class="expected">Expected: <b>${r.expected}</b></div>
-    </article>`).join("") : '<div class="empty">No reels added yet.</div>';
+      <div class="expected">${monitor?"Monitoring: <b>Every 5 minutes</b>":"Expected: <b>"+r.expected+"</b>"}${last}</div>
+    </article>`;
+  }).join("") : '<div class="empty">No reels added yet.</div>';
   updateSummary();
 }
 
