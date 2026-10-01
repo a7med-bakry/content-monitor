@@ -320,7 +320,27 @@ window.openTikTokMonitor=function(video,account){
    viewStart:vs,viewWindow:vw,viewRepeat:vr,viewTarget:vt,
    likeStart:ls,likeWindow:lw,likeRepeat:lr,likeTarget:lt,updatedAt:Date.now()
   };
-  saveTikTokMonitors(monitors);o.remove();alert("Monitoring saved. Each window will use its own start baseline.");
+  saveTikTokMonitors(monitors);
+  const existingReel = reelsData.findIndex(r => r.platform === "TikTok" && String(r.videoId) === id);
+  const card = {
+    videoId:id,
+    name:video.title||video.video_description||"TikTok Video",
+    platform:"TikTok",
+    url:video.share_url||"",
+    accountUsername:account.username,
+    views:Number(video.view_count||0),
+    viewDelta:0,
+    likes:Number(video.like_count||0),
+    likeDelta:0,
+    expected:"Monitoring every 5 minutes",
+    status:"ok"
+  };
+  if(existingReel >= 0) reelsData[existingReel] = {...reelsData[existingReel], ...card};
+  else reelsData.unshift(card);
+  saveReels();
+  o.remove();
+  renderHome();
+  alert("Monitoring saved. Snapshots are taken every 5 minutes for monitored clips only.");
  };
 };
 
