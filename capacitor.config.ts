@@ -4,10 +4,6 @@ const config: CapacitorConfig = {
   appId: 'com.contentmonitor.app',
   appName: 'Content Monitor',
   webDir: 'dist',
-  server: {
-    url: 'https://a7med-bakry.github.io/content-monitor/',
-    cleartext: false
-  },
   plugins: {
     SplashScreen: {
       launchAutoHide: true,
