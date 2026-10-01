@@ -1,4 +1,4 @@
-name: Android Professional Build
+name: Android Professional APK
 
 on:
   push:
@@ -15,63 +15,67 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node 22
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
-      - name: Install
+      - name: Install dependencies
         run: npm install
 
-      - name: Build web bundle
+      - name: Build web app
         run: npm run build
 
-      - name: Add Android
+      - name: Create Android project
         run: npx cap add android
 
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Configure TikTok deep link
+      - name: Install Firebase configuration
+        run: |
+          test -f android/app/google-services.json
+          python - <<'PY'
+          import json
+          p="android/app/google-services.json"
+          data=json.load(open(p))
+          apps=data.get("client",[])
+          if not apps:
+              raise SystemExit("Invalid google-services.json: no Firebase clients found")
+          package=apps[0].get("client_info",{}).get("android_client_info",{}).get("package_name")
+          if package != "com.contentmonitor.app":
+              raise SystemExit(f"Firebase package mismatch: {package!r}; expected 'com.contentmonitor.app'")
+          print("Firebase package verified:", package)
+          PY
+
+      - name: Configure Android deep link
         shell: python
         run: |
           from pathlib import Path
-          p = Path("android/app/src/main/AndroidManifest.xml")
-          s = p.read_text()
-          needle = '''</intent-filter>\n</activity>'''
-          extra = '''</intent-filter>
-              <intent-filter>
+          p=Path("android/app/src/main/AndroidManifest.xml")
+          s=p.read_text()
+          marker="</activity>"
+          intent='''<intent-filter>
                   <action android:name="android.intent.action.VIEW" />
                   <category android:name="android.intent.category.DEFAULT" />
                   <category android:name="android.intent.category.BROWSABLE" />
                   <data android:scheme="com.contentmonitor.app" android:host="oauth" />
               </intent-filter>
-          </activity>'''
-          if needle not in s:
-              raise SystemExit("MainActivity manifest marker not found")
-          p.write_text(s.replace(needle, extra, 1))
+          '''
+          if 'android:scheme="com.contentmonitor.app"' not in s:
+              s=s.replace(marker, intent+marker, 1)
+          p.write_text(s)
 
-      - name: Configure Firebase
-        env:
-          FIREBASE_JSON_B64: ${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON_B64 }}
-        run: |
-          if [ -z "$FIREBASE_JSON_B64" ]; then
-            echo "::error::FIREBASE_GOOGLE_SERVICES_JSON_B64 is not configured."
-            echo "Create an Android Firebase app for package com.contentmonitor.app and add the downloaded google-services.json as this GitHub secret."
-            exit 1
-          fi
-          echo "$FIREBASE_JSON_B64" | base64 --decode > android/app/google-services.json
-
-      - name: Build APK
+      - name: Build debug APK
         run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
 
-      - name: Upload APK
+      - name: Publish APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Content-Monitor-Android
+          name: Content-Monitor-Pro-Android
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
