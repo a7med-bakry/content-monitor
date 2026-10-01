@@ -40,15 +40,27 @@ function showAccounts(){
     reels.innerHTML = '<div class="empty">No accounts connected yet.<br><br><button class="primary" onclick="openAccountModal()">Connect Instagram</button><br><br><button class="secondary" onclick="connectTikTok()">Connect TikTok</button></div>';
     return;
   }
-  reels.innerHTML = accounts.map((a,i) => `
+  reels.innerHTML = accounts.map((a,i) => {
+    const isTikTok = a.platform === "TikTok";
+    return `
     <article class="card">
-      <div class="card-top"><div><div class="title">${a.username}</div><div class="platform">Instagram · Test account</div></div><span class="status ok">CONNECTED</span></div>
-      <div class="expected">Test Reel: <b>${a.testReel ? "Added" : "Not added"}</b></div>
+      <div class="card-top">
+        <div style="display:flex;gap:10px;align-items:center">
+          ${isTikTok && a.avatar ? `<img src="${a.avatar}" alt="" style="width:42px;height:42px;border-radius:50%;object-fit:cover">` : ""}
+          <div>
+            <div class="title">${a.username}</div>
+            <div class="platform">${a.platform}${isTikTok ? " · Connected" : " · Test account"}</div>
+          </div>
+        </div>
+        <span class="status ok">CONNECTED</span>
+      </div>
+      <div class="expected">${isTikTok ? "TikTok profile connected successfully." : `Test Reel: <b>${a.testReel ? "Added" : "Not added"}</b>`}</div>
       <div class="account-actions">
-        <button class="primary small" onclick="addTestReel(${i})">${a.testReel ? "Change Test Reel" : "Add Test Reel"}</button>
+        ${isTikTok ? "" : `<button class="primary small" onclick="addTestReel(${i})">${a.testReel ? "Change Test Reel" : "Add Test Reel"}</button>`}
         <button class="secondary" onclick="removeAccount(${i})">Remove</button>
       </div>
-    </article>`).join("");
+    </article>`;
+  }).join("");
 }
 
 function openModal(){ modal.classList.remove("hidden"); }
@@ -128,22 +140,30 @@ document.querySelector("#saveBtn").onclick = () => {
   renderHome();
 };
 
-renderHome();
-
 function connectTikTok(){
   window.location.href = "https://rwnesehhsblejmrbzzsu.supabase.co/functions/v1/tiktok-start";
 }
-
 window.connectTikTok = connectTikTok;
 
 (function handleTikTokResult(){
   const p = new URLSearchParams(window.location.search);
   if(p.get("tiktok") === "connected"){
-    alert("TikTok authorization completed.");
+    const name = p.get("name") || "TikTok User";
+    const avatar = p.get("avatar") || "";
+    const openId = p.get("open_id") || "";
+    const existing = accounts.findIndex(a => a.platform === "TikTok" && a.openId === openId);
+    const account = {platform:"TikTok", username:name, displayName:name, avatar, openId, connectedAt:Date.now()};
+    if(existing >= 0) accounts[existing] = {...accounts[existing], ...account};
+    else accounts.push(account);
+    saveAccounts();
     history.replaceState({}, document.title, window.location.pathname);
     showAccounts();
+    alert("TikTok connected: " + name);
   } else if(p.get("tiktok") === "error"){
-    alert("TikTok authorization failed. Please try again.");
+    const reason = p.get("reason");
+    alert("TikTok authorization failed." + (reason ? "\\n\\n" + reason : ""));
     history.replaceState({}, document.title, window.location.pathname);
   }
 })();
+
+renderHome();
