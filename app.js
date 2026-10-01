@@ -270,7 +270,7 @@ if (Capacitor.isNativePlatform()) {
       if (u.searchParams.get("tiktok")) {
         const qs = u.searchParams.toString();
         history.replaceState({}, document.title, window.location.pathname + (qs ? "?" + qs : ""));
-        window.dispatchEvent(new Event("tiktok-oauth-return"));
+        handleTikTokResult();
       }
     } catch (e) {
       console.warn("Native URL handling failed", e);
@@ -717,7 +717,7 @@ async function connectTikTok(){
 }
 window.connectTikTok = connectTikTok;
 
-(function handleTikTokResult(){
+function handleTikTokResult(){
   const p = new URLSearchParams(window.location.search);
   if(p.get("tiktok") === "connected"){
     const name = p.get("name") || "TikTok User";
@@ -736,6 +736,8 @@ window.connectTikTok = connectTikTok;
     alert("TikTok authorization failed." + (reason ? "\\n\\n" + reason : ""));
     history.replaceState({}, document.title, window.location.pathname);
   }
-})();
+}
+
+handleTikTokResult();
 
 refreshRemoteSnapshots().finally(renderHome);
