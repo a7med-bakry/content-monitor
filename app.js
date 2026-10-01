@@ -59,11 +59,11 @@ window.openAccountModal = openAccountModal;
 document.querySelector("#addBtn").onclick = openModal;
 document.querySelector("#newReel").onclick = openModal;
 document.querySelector("#closeBtn").onclick = closeModal;
-document.querySelector("#accountsBtn").onclick = showAccounts;
-document.querySelector(".bottom button:first-child").onclick = renderHome;
-document.querySelector("#accountClose").onclick = () => accountModal.classList.add("hidden");
+document.querySelector("#accountsBtn").addEventListener("click", showAccounts);
+document.querySelector(".bottom button:first-child").addEventListener("click", renderHome);
+document.querySelector("#accountClose").addEventListener("click", () => accountModal.classList.add("hidden"));
 
-document.querySelector("#connectIg").onclick = () => {
+document.querySelector("#connectIg").addEventListener("click", () => {
   const u = document.querySelector("#igUsername").value.trim().replace(/^@/,"");
   if(!u){ alert("Add the Instagram username first"); return; }
   const username = "@" + u;
@@ -74,7 +74,7 @@ document.querySelector("#connectIg").onclick = () => {
   document.querySelector("#igUsername").value = "";
   accountModal.classList.add("hidden");
   showAccounts();
-};
+});
 
 window.addTestReel = function(index){
   testAccountIndex = index;
