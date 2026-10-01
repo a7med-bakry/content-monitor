@@ -1,0 +1,77 @@
+name: Android Professional Build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm install
+
+      - name: Build web bundle
+        run: npm run build
+
+      - name: Add Android
+        run: npx cap add android
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Configure TikTok deep link
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          s = p.read_text()
+          needle = '''</intent-filter>\n</activity>'''
+          extra = '''</intent-filter>
+              <intent-filter>
+                  <action android:name="android.intent.action.VIEW" />
+                  <category android:name="android.intent.category.DEFAULT" />
+                  <category android:name="android.intent.category.BROWSABLE" />
+                  <data android:scheme="com.contentmonitor.app" android:host="oauth" />
+              </intent-filter>
+          </activity>'''
+          if needle not in s:
+              raise SystemExit("MainActivity manifest marker not found")
+          p.write_text(s.replace(needle, extra, 1))
+
+      - name: Configure Firebase
+        env:
+          FIREBASE_JSON_B64: ${{ secrets.FIREBASE_GOOGLE_SERVICES_JSON_B64 }}
+        run: |
+          if [ -z "$FIREBASE_JSON_B64" ]; then
+            echo "::error::FIREBASE_GOOGLE_SERVICES_JSON_B64 is not configured."
+            echo "Create an Android Firebase app for package com.contentmonitor.app and add the downloaded google-services.json as this GitHub secret."
+            exit 1
+          fi
+          echo "$FIREBASE_JSON_B64" | base64 --decode > android/app/google-services.json
+
+      - name: Build APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Content-Monitor-Android
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
