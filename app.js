@@ -204,36 +204,66 @@ function saveTikTokSnapshots(data){
 
 function recordTikTokSnapshots(videos){
   const all = loadTikTokSnapshots();
+  const monitors = loadTikTokMonitors();
   const now = Date.now();
+  const drops = [];
 
   videos.forEach(v => {
     const id = String(v.id || "");
-    if(!id) return;
+    if(!id || !monitors[id]) return;
 
     if(!Array.isArray(all[id])) all[id] = [];
     const previous = all[id][all[id].length - 1];
+    const current = {
+      capturedAt: now,
+      views: Number(v.view_count || 0),
+      likes: Number(v.like_count || 0),
+      comments: Number(v.comment_count || 0),
+      shares: Number(v.share_count || 0)
+    };
 
     const sameStats = previous &&
-      Number(previous.views) === Number(v.view_count || 0) &&
-      Number(previous.likes) === Number(v.like_count || 0) &&
-      Number(previous.comments) === Number(v.comment_count || 0) &&
-      Number(previous.shares) === Number(v.share_count || 0);
+      Number(previous.views) === current.views &&
+      Number(previous.likes) === current.likes &&
+      Number(previous.comments) === current.comments &&
+      Number(previous.shares) === current.shares;
 
     if(!sameStats){
-      all[id].push({
-        capturedAt: now,
-        views: Number(v.view_count || 0),
-        likes: Number(v.like_count || 0),
-        comments: Number(v.comment_count || 0),
-        shares: Number(v.share_count || 0)
-      });
+      if(previous){
+        const viewsDrop = current.views < Number(previous.views || 0);
+        const likesDrop = current.likes < Number(previous.likes || 0);
+        if(viewsDrop || likesDrop){
+          drops.push({
+            id,
+            title: monitors[id].title || "TikTok Video",
+            viewsDrop: viewsDrop ? [Number(previous.views || 0), current.views] : null,
+            likesDrop: likesDrop ? [Number(previous.likes || 0), current.likes] : null
+          });
+        }
+      }
+      all[id].push(current);
     }
 
-    // Keep the browser storage small: last 100 snapshots per video.
     if(all[id].length > 100) all[id] = all[id].slice(-100);
   });
 
   saveTikTokSnapshots(all);
+
+  if(drops.length && "serviceWorker" in navigator && Notification.permission === "granted"){
+    navigator.serviceWorker.ready.then(reg => {
+      drops.forEach(d => {
+        const parts = [];
+        if(d.viewsDrop) parts.push("Views "+d.viewsDrop[0].toLocaleString()+" → "+d.viewsDrop[1].toLocaleString());
+        if(d.likesDrop) parts.push("Likes "+d.likesDrop[0].toLocaleString()+" → "+d.likesDrop[1].toLocaleString());
+        reg.showNotification("⚠️ Metric drop detected", {
+          body: d.title + " · " + parts.join(" · "),
+          tag: "drop-" + d.id,
+          data: {videoId:d.id}
+        });
+      });
+    }).catch(()=>{});
+  }
+
   return all;
 }
 
@@ -471,14 +501,14 @@ window.viewTikTokVideos = async function(index){
         return;
       }
 
-      const snapshots = recordTikTokSnapshots(videos);
+      const monitoredVideos = videos.filter(v => loadTikTokMonitors()[String(v.id)]);\n      const snapshots = recordTikTokSnapshots(monitoredVideos);
       let savedCount = 0;
       videos.forEach(v => {
         const h = snapshots[String(v.id)] || [];
         if(h.length) savedCount++;
       });
 
-      status.textContent = "Snapshot captured for " + savedCount + " videos · " + new Date().toLocaleTimeString();
+      status.textContent = "Snapshot captured for " + savedCount + " monitored videos · " + new Date().toLocaleTimeString();
 
       body.innerHTML = videos.map(v => {
         const title = v.title || v.video_description || "TikTok Video";
