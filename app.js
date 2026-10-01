@@ -141,6 +141,98 @@ document.querySelector("#saveBtn").onclick = () => {
 };
 
 
+function loadTikTokSnapshots(){
+  try { return JSON.parse(localStorage.getItem("cm_tiktok_snapshots") || "{}"); }
+  catch(e){ return {}; }
+}
+
+function saveTikTokSnapshots(data){
+  localStorage.setItem("cm_tiktok_snapshots", JSON.stringify(data));
+}
+
+function recordTikTokSnapshots(videos){
+  const all = loadTikTokSnapshots();
+  const now = Date.now();
+
+  videos.forEach(v => {
+    const id = String(v.id || "");
+    if(!id) return;
+
+    if(!Array.isArray(all[id])) all[id] = [];
+    const previous = all[id][all[id].length - 1];
+
+    const sameStats = previous &&
+      Number(previous.views) === Number(v.view_count || 0) &&
+      Number(previous.likes) === Number(v.like_count || 0) &&
+      Number(previous.comments) === Number(v.comment_count || 0) &&
+      Number(previous.shares) === Number(v.share_count || 0);
+
+    if(!sameStats){
+      all[id].push({
+        capturedAt: now,
+        views: Number(v.view_count || 0),
+        likes: Number(v.like_count || 0),
+        comments: Number(v.comment_count || 0),
+        shares: Number(v.share_count || 0)
+      });
+    }
+
+    // Keep the browser storage small: last 100 snapshots per video.
+    if(all[id].length > 100) all[id] = all[id].slice(-100);
+  });
+
+  saveTikTokSnapshots(all);
+  return all;
+}
+
+function formatSnapshotTime(ts){
+  return new Date(ts).toLocaleString([], {
+    day:"2-digit", month:"2-digit", year:"numeric",
+    hour:"2-digit", minute:"2-digit"
+  });
+}
+
+function snapshotDelta(current, previous){
+  if(!previous) return null;
+  return {
+    views: current.views - previous.views,
+    likes: current.likes - previous.likes,
+    comments: current.comments - previous.comments,
+    shares: current.shares - previous.shares
+  };
+}
+
+window.showTikTokHistory = function(videoId, title){
+  const all = loadTikTokSnapshots();
+  const history = all[String(videoId)] || [];
+
+  const overlay = document.createElement("div");
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:10000;overflow:auto;padding:20px;";
+  overlay.innerHTML = "<div style='max-width:820px;margin:30px auto;background:#111;color:#fff;border-radius:18px;padding:18px;'>" +
+    "<div style='display:flex;justify-content:space-between;align-items:center;gap:12px;'>" +
+    "<div><h2 style='margin:0 0 5px;'>History</h2><div style='opacity:.7;font-size:13px;'>" + title + "</div></div>" +
+    "<button id='closeHistory' class='secondary'>Close</button></div>" +
+    "<div style='margin-top:16px;'>" +
+    (history.length ? history.slice().reverse().map((s, i, arr) => {
+      const previous = arr[i + 1];
+      const d = snapshotDelta(s, previous);
+      const deltaText = d ? "Δ Views: " + (d.views >= 0 ? "+" : "") + d.views.toLocaleString() +
+        " · Likes: " + (d.likes >= 0 ? "+" : "") + d.likes.toLocaleString() +
+        " · Comments: " + (d.comments >= 0 ? "+" : "") + d.comments.toLocaleString() +
+        " · Shares: " + (d.shares >= 0 ? "+" : "") + d.shares.toLocaleString() : "First snapshot";
+
+      return "<div style='padding:12px 0;border-bottom:1px solid #2b2b2b;'>" +
+        "<div style='font-size:12px;opacity:.65;margin-bottom:6px;'>" + formatSnapshotTime(s.capturedAt) + "</div>" +
+        "<div style='font-size:14px;line-height:1.8;'>Views <b>" + s.views.toLocaleString() + "</b> · Likes <b>" + s.likes.toLocaleString() +
+        "</b> · Comments <b>" + s.comments.toLocaleString() + "</b> · Shares <b>" + s.shares.toLocaleString() + "</b></div>" +
+        "<div style='font-size:12px;opacity:.75;margin-top:4px;'>" + deltaText + "</div></div>";
+    }).join("") : "<div class='empty'>No snapshots yet. Refresh the videos later to start building history.</div>") +
+    "</div></div>";
+
+  document.body.appendChild(overlay);
+  overlay.querySelector("#closeHistory").onclick = () => overlay.remove();
+};
+
 window.viewTikTokVideos = async function(index){
   const account = accounts[index];
   if(!account || account.platform !== "TikTok"){ alert("TikTok account not found"); return; }
@@ -149,32 +241,83 @@ window.viewTikTokVideos = async function(index){
 
   const overlay = document.createElement("div");
   overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;overflow:auto;padding:20px;";
-  overlay.innerHTML = "<div style='max-width:760px;margin:30px auto;background:#111;color:#fff;border-radius:18px;padding:18px;'><div style='display:flex;justify-content:space-between;align-items:center;gap:12px;'><h2 style='margin:0;'>" + account.username + " · Videos</h2><button id='closeTikTokVideos' class='secondary'>Close</button></div><div id='tiktokVideoBody' style='margin-top:16px;'>Loading videos...</div></div>";
+  overlay.innerHTML = "<div style='max-width:820px;margin:30px auto;background:#111;color:#fff;border-radius:18px;padding:18px;'>" +
+    "<div style='display:flex;justify-content:space-between;align-items:center;gap:12px;'>" +
+    "<h2 style='margin:0;'>" + account.username + " · Videos</h2>" +
+    "<div style='display:flex;gap:8px;'><button id='refreshTikTokVideos' class='primary small'>Refresh</button><button id='closeTikTokVideos' class='secondary'>Close</button></div></div>" +
+    "<div id='tiktokSnapshotStatus' style='margin-top:10px;font-size:12px;opacity:.65;'></div>" +
+    "<div id='tiktokVideoBody' style='margin-top:16px;'>Loading videos...</div></div>";
   document.body.appendChild(overlay);
+
   overlay.querySelector("#closeTikTokVideos").onclick = () => overlay.remove();
+  overlay.querySelector("#refreshTikTokVideos").onclick = () => loadVideos();
 
-  try{
-    const res = await fetch("https://rwnesehhsblejmrbzzsu.supabase.co/functions/v1/tiktok-videos", {
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({open_id:openId})
-    });
-    const data = await res.json();
-    if(!res.ok) throw new Error(data?.details?.message || data?.error || "Failed to load TikTok videos");
-    const videos = data.videos || [];
+  async function loadVideos(){
     const body = overlay.querySelector("#tiktokVideoBody");
-    if(!videos.length){ body.innerHTML = "<div class='empty'>No public videos returned by TikTok.</div>"; return; }
-    body.innerHTML = videos.map(v => {
-      const title = v.title || v.video_description || "TikTok Video";
-      const cover = v.cover_image_url ? "<img src='" + v.cover_image_url + "' alt='' style='width:110px;height:150px;object-fit:cover;border-radius:10px;background:#222;'>" : "";
-      const link = v.share_url ? "<a href='" + v.share_url + "' target='_blank' rel='noopener' style='display:inline-block;margin-top:8px;'>Open on TikTok</a>" : "";
-      return "<article style='display:flex;gap:14px;padding:12px 0;border-bottom:1px solid #2b2b2b;'>" + cover + "<div style='flex:1;min-width:0;'><div style='font-weight:700;margin-bottom:8px;'>" + title + "</div><div style='font-size:14px;line-height:1.8;'>Views: <b>" + Number(v.view_count || 0).toLocaleString() + "</b><br>Likes: <b>" + Number(v.like_count || 0).toLocaleString() + "</b><br>Comments: <b>" + Number(v.comment_count || 0).toLocaleString() + "</b><br>Shares: <b>" + Number(v.share_count || 0).toLocaleString() + "</b></div>" + link + "</div></article>";
-    }).join("");
-  }catch(err){
-    overlay.querySelector("#tiktokVideoBody").innerHTML = "<div class='empty'>Failed to load videos.<br><br>" + String(err.message || err) + "</div>";
-  }
-};
+    const status = overlay.querySelector("#tiktokSnapshotStatus");
+    const refresh = overlay.querySelector("#refreshTikTokVideos");
+    if(!body) return;
 
+    refresh.disabled = true;
+    body.innerHTML = "Loading videos...";
+    status.textContent = "Fetching latest stats...";
+
+    try{
+      const res = await fetch("https://rwnesehhsblejmrbzzsu.supabase.co/functions/v1/tiktok-videos", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({open_id:openId})
+      });
+
+      const data = await res.json();
+      if(!res.ok) throw new Error(data?.details?.message || data?.error || "Failed to load TikTok videos");
+
+      const videos = data.videos || [];
+      if(!videos.length){
+        body.innerHTML = "<div class='empty'>No public videos returned by TikTok.</div>";
+        status.textContent = "No videos returned.";
+        return;
+      }
+
+      const snapshots = recordTikTokSnapshots(videos);
+      let savedCount = 0;
+      videos.forEach(v => {
+        const h = snapshots[String(v.id)] || [];
+        if(h.length) savedCount++;
+      });
+
+      status.textContent = "Snapshot captured for " + savedCount + " videos · " + new Date().toLocaleTimeString();
+
+      body.innerHTML = videos.map(v => {
+        const title = v.title || v.video_description || "TikTok Video";
+        const cover = v.cover_image_url ? "<img src='" + v.cover_image_url + "' alt='' style='width:110px;height:150px;object-fit:cover;border-radius:10px;background:#222;'>" : "";
+        const link = v.share_url ? "<a href='" + v.share_url + "' target='_blank' rel='noopener' style='display:inline-block;margin-top:8px;'>Open on TikTok</a>" : "";
+        const historyCount = (snapshots[String(v.id)] || []).length;
+        const safeTitle = String(title).replace(/'/g, "&#39;").replace(/"/g, "&quot;");
+
+        return "<article style='display:flex;gap:14px;padding:12px 0;border-bottom:1px solid #2b2b2b;'>" +
+          cover +
+          "<div style='flex:1;min-width:0;'>" +
+          "<div style='font-weight:700;margin-bottom:8px;'>" + title + "</div>" +
+          "<div style='font-size:14px;line-height:1.8;'>Views: <b>" + Number(v.view_count || 0).toLocaleString() +
+          "</b><br>Likes: <b>" + Number(v.like_count || 0).toLocaleString() +
+          "</b><br>Comments: <b>" + Number(v.comment_count || 0).toLocaleString() +
+          "</b><br>Shares: <b>" + Number(v.share_count || 0).toLocaleString() + "</b></div>" +
+          "<div style='display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;'>" +
+          "<button class='secondary small' onclick='showTikTokHistory(" + JSON.stringify(String(v.id)) + "," + JSON.stringify(String(title)) + ")'>History (" + historyCount + ")</button>" +
+          link +
+          "</div></div></article>";
+      }).join("");
+    }catch(err){
+      body.innerHTML = "<div class='empty'>Failed to load videos.<br><br>" + String(err.message || err) + "</div>";
+      status.textContent = "Snapshot not saved.";
+    }finally{
+      refresh.disabled = false;
+    }
+  }
+
+  loadVideos();
+};
 function connectTikTok(){
   window.location.href = "https://rwnesehhsblejmrbzzsu.supabase.co/functions/v1/tiktok-start";
 }
