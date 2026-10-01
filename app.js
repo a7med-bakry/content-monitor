@@ -283,6 +283,7 @@ window.openTikTokMonitor=function(video,account){
  };
 };
 
+// Repeating growth windows: each cycle gets its own baseline at window start.
 function getGrowthWindow(m,type,now){
  const prefix=type==="views"?"view":"like",start=Number(m[prefix+"Start"]),windowMin=Number(m[prefix+"Window"]),repeatMin=Number(m[prefix+"Repeat"]);
  if(!start||!windowMin||!repeatMin||now<start)return {state:"WAIT",growth:0,target:Number(m[prefix+"Target"]||0),windowStart:start,windowEnd:start+windowMin*60000};
@@ -299,8 +300,8 @@ function monitorStatus(video){
   const w=getGrowthWindow(m,type,now),prefix=type==="views"?"view":"like";
   if(w.state==="WAIT")return {...w,growth:0};
   let baseline=current;
-  for(const s of history){
-   const t=Number(s.capturedAt);
+  for(let i=history.length-1;i>=0;i--){
+   const s=history[i],t=Number(s.capturedAt);
    if(t<=w.windowStart){baseline=Number(s[type==="views"?"views":"likes"]||current);break;}
   }
   const growth=current-baseline;
