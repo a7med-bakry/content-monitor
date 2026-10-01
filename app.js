@@ -33,18 +33,23 @@ async function setupNotifications(){
       return;
     }
 
-    let reg = await navigator.serviceWorker.register("./service-worker.js", {
-      scope: "./",
+    // Register from the real site base path. This avoids relative-path issues on GitHub Pages.
+    const swUrl = new URL("service-worker.js", document.baseURI).href;
+    const swScope = new URL("./", document.baseURI).pathname;
+    let reg = await navigator.serviceWorker.register(swUrl, {
+      scope: swScope,
       updateViaCache: "none"
     });
     await reg.update().catch(()=>{});
     reg = await navigator.serviceWorker.ready;
 
     const currentKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
+    if(currentKey.length !== 65 || currentKey[0] !== 4){
+      throw new Error("Invalid VAPID public key");
+    }
+
     let sub = await reg.pushManager.getSubscription();
 
-    // If a subscription exists but was created with another VAPID key,
-    // remove it before creating a new one.
     if(sub){
       try{
         const existingKey = sub.options && sub.options.applicationServerKey;
@@ -61,21 +66,14 @@ async function setupNotifications(){
     }
 
     if(!sub){
+      // BufferSource compatibility: try ArrayBuffer first, then Uint8Array.
       try{
         sub = await reg.pushManager.subscribe({
           userVisibleOnly:true,
-          applicationServerKey:currentKey
+          applicationServerKey:currentKey.buffer
         });
       }catch(firstError){
-        // Clear a possibly stale worker registration and retry once.
-        await navigator.serviceWorker.getRegistrations().then(list =>
-          Promise.all(list.map(x => x.unregister()))
-        ).catch(()=>{});
-        reg = await navigator.serviceWorker.register("./service-worker.js", {
-          scope:"./",
-          updateViaCache:"none"
-        });
-        await navigator.serviceWorker.ready;
+        console.warn("Push subscribe (ArrayBuffer) failed:", firstError);
         sub = await reg.pushManager.subscribe({
           userVisibleOnly:true,
           applicationServerKey:currentKey
