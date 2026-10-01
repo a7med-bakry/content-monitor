@@ -27,8 +27,13 @@ jobs:
       - name: Build web app
         run: npm run build
 
-      - name: Create Android project
-        run: npx cap add android
+      - name: Prepare Android project
+        run: |
+          cp android/app/google-services.json /tmp/google-services.json
+          rm -rf android
+          npx cap add android
+          mkdir -p android/app
+          cp /tmp/google-services.json android/app/google-services.json
 
       - name: Sync Capacitor
         run: npx cap sync android
@@ -36,7 +41,7 @@ jobs:
       - name: Install Firebase configuration
         run: |
           test -f android/app/google-services.json
-          python - <<'PY'
+          python - <<'PY
           import json
           p="android/app/google-services.json"
           data=json.load(open(p))
