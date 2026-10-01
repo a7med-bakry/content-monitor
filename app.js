@@ -35,7 +35,7 @@ function updateSummary(){
 
 function showAccounts(){
   currentScreen = "accounts";
-  document.querySelector("#section-head").textContent = "Accounts";
+  document.querySelector("#section-head").innerHTML = `Accounts <button class="secondary small" onclick="connectTikTok()" style="float:right">＋ Add TikTok</button>`;
   if(!accounts.length){
     reels.innerHTML = '<div class="empty">No accounts connected yet.<br><br><button class="primary" onclick="openAccountModal()">Connect Instagram</button><br><br><button class="secondary" onclick="connectTikTok()">Connect TikTok</button></div>';
     return;
