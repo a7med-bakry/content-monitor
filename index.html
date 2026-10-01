@@ -7,15 +7,51 @@
 </head>
 <body>
 <div class="app">
-  <header class="topbar"><div><div class="eyebrow">CONTENT MONITOR</div><h1>My Content</h1></div><div style="display:flex;gap:8px"><button class="icon-btn" id="notifyBtn" title="Notifications">🔔</button><button class="icon-btn" id="addBtn">＋</button></div></header>
+  <header class="topbar"><div><div class="eyebrow">CONTENT MONITOR</div><h1>My Reels</h1></div><div style="display:flex;gap:8px"><button class="icon-btn" id="notifyBtn" title="Notifications">🔔</button><button class="icon-btn" id="addBtn">＋</button></div></header>
   <main>
-    <section class="summary"><div><span>Monitored</span><strong id="total">3</strong></div><div><span>Normal</span><strong class="ok" id="normal">2</strong></div><div><span>Alerts</span><strong class="bad" id="alerts">1</strong></div></section>
-    <div class="section-head"><h2 id="section-head">Reels</h2><button class="text-btn" id="manageBtn">Manage</button></div>
+    <section class="summary"><div><span>Monitored</span><strong id="total">0</strong></div><div><span>Active</span><strong class="ok" id="normal">0</strong></div><div><span>Alerts</span><strong class="bad" id="alerts">0</strong></div></section>
+    <div class="section-head"><h2 id="section-head">Reels</h2><button class="text-btn" id="refreshBtn">Refresh</button></div>
     <section id="reels" class="reels"></section>
   </main>
-  <nav class="bottom"><button class="active">⌂<span>Home</span></button><button id="accountsBtn">◉<span>Accounts</span></button><button id="newReel">＋<span>Add Reel</span></button><button>⚙<span>Settings</span></button></nav>
+  <nav class="bottom"><button class="active" id="homeBtn">⌂<span>Home</span></button><button id="newReel">＋<span>Add Reel</span></button><button id="settingsBtn">⚙<span>Settings</span></button></nav>
 </div>
-<div class="modal hidden" id="modal"><div class="sheet"><button class="close" id="closeBtn">×</button><h2>Add monitored Reel</h2><label>Platform<select id="platform"><option>Instagram</option><option>TikTok</option></select></label><label>Reel URL<input id="url" placeholder="https://..."></label><div class="grid"><label>Expected views / hour<input id="views" type="number" value="100"></label><label>Expected likes / 3 hours<input id="likes" type="number" value="10"></label></div><button class="primary" id="saveBtn">Add Reel</button></div></div>
-<div class="modal hidden" id="accountModal"><div class="sheet"><button class="close" id="accountClose">×</button><h2>Connect Instagram</h2><p class="hint">Test connection only. Add your Instagram username first.</p><label>Instagram username<input id="igUsername" placeholder="@username"></label><button class="primary" id="connectIg">Add Instagram Account</button></div></div>
+
+<div class="modal hidden" id="modal">
+  <div class="sheet">
+    <button class="close" id="closeBtn">×</button>
+    <h2>Add monitored Reel</h2>
+    <p class="hint">Paste the Reel/Video URL. The first snapshot is collected immediately after adding it.</p>
+    <label>Platform<select id="platform"><option value="instagram">Instagram</option><option value="tiktok">TikTok</option></select></label>
+    <label>Reel URL<input id="url" placeholder="https://www.instagram.com/reel/..."></label>
+    <label>Title (optional)<input id="title" placeholder="My Reel"></label>
+    <div class="grid">
+      <label>Start<input id="start" type="datetime-local"></label>
+      <label>End<input id="end" type="datetime-local"></label>
+    </div>
+    <label>Snapshot interval
+      <select id="interval">
+        <option value="5">Every 5 minutes</option>
+        <option value="15" selected>Every 15 minutes</option>
+        <option value="30">Every 30 minutes</option>
+        <option value="60">Every hour</option>
+        <option value="180">Every 3 hours</option>
+        <option value="360">Every 6 hours</option>
+        <option value="720">Every 12 hours</option>
+        <option value="1440">Every 24 hours</option>
+      </select>
+    </label>
+    <button class="primary" id="saveBtn">Add Reel & Take First Snapshot</button>
+  </div>
+</div>
+
+<div class="modal hidden" id="settingsModal">
+  <div class="sheet">
+    <button class="close" id="settingsClose">×</button>
+    <h2>Settings</h2>
+    <p class="hint">The collector runs from Supabase and checks due Reels automatically.</p>
+    <button class="secondary" id="enableNotifications">Enable Notifications</button>
+  </div>
+</div>
+
 <script type="module" src="./app.js"></script>
 </body></html>
