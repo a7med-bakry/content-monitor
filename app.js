@@ -520,7 +520,8 @@ window.viewTikTokVideos = async function(index){
         return;
       }
 
-      const monitoredVideos = videos.filter(v => loadTikTokMonitors()[String(v.id)]);\n      const snapshots = recordTikTokSnapshots(monitoredVideos);
+      const monitoredVideos = videos.filter(v => loadTikTokMonitors()[String(v.id)]);
+      const snapshots = recordTikTokSnapshots(monitoredVideos);
       let savedCount = 0;
       videos.forEach(v => {
         const h = snapshots[String(v.id)] || [];
