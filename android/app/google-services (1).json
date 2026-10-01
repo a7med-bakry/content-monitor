@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "407958117294",
+    "project_id": "contentmonitor-8ebc7",
+    "storage_bucket": "contentmonitor-8ebc7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:407958117294:android:becc63e28160bb31d7063f",
+        "android_client_info": {
+          "package_name": "com.contentmonitor.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCl-iAxRlhVJGb00ToRbFIX-Pb_L6PhI-8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
