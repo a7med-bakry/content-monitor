@@ -374,7 +374,7 @@ window.viewTikTokVideos = async function(index){
         const safeTitle = String(title).replace(/'/g, "&#39;").replace(/"/g, "&quot;");
         const mon = monitorStatus(v);
         const monitorButton = mon ? "<button class='primary small' onclick='openTikTokMonitor(" + JSON.stringify(v) + "," + JSON.stringify(account) + ")'>Edit Monitoring</button>" : "<button class='primary small' onclick='openTikTokMonitor(" + JSON.stringify(v) + "," + JSON.stringify(account) + ")'>Monitor Growth</button>";
-        const monitorInfo = mon ? "<div style='margin-top:10px;padding:9px;border-radius:10px;background:#191919;font-size:12px;line-height:1.7;'>Views: <b>" + mon.viewGrowth.toLocaleString() + "</b> / " + mon.m.viewTarget.toLocaleString() + " · " + mon.view + "<br>Likes: <b>" + mon.likeGrowth.toLocaleString() + "</b> / " + mon.m.likeTarget.toLocaleString() + " · " + mon.like + "</div>" : "";
+        const monitorInfo = mon ? "<div style='margin-top:10px;padding:9px;border-radius:10px;background:#191919;font-size:12px;line-height:1.7;'>Views: <b>" + mon.views.growth.toLocaleString() + "</b> / " + mon.views.target.toLocaleString() + " · " + mon.views.state + " · " + formatSnapshotTime(mon.views.windowStart) + " → " + formatSnapshotTime(mon.views.windowEnd) + "<br>Likes: <b>" + mon.likes.growth.toLocaleString() + "</b> / " + mon.likes.target.toLocaleString() + " · " + mon.likes.state + " · " + formatSnapshotTime(mon.likes.windowStart) + " → " + formatSnapshotTime(mon.likes.windowEnd) + "</div>" : "";
 
         return "<article style='display:flex;gap:14px;padding:12px 0;border-bottom:1px solid #2b2b2b;'>" +
           cover +
