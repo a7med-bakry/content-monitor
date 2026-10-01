@@ -1,19 +1,23 @@
 {
   "name": "content-monitor",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
-  "description": "Content Monitor web app and Android app powered by Capacitor",
+  "description": "Content Monitor web app with a native Android shell",
   "scripts": {
-    "android:add": "cap add android",
-    "android:sync": "cap sync android",
+    "build": "vite build",
+    "preview": "vite preview",
+    "android:add": "npx cap add android",
+    "android:sync": "npx cap sync android",
     "android:build": "cd android && ./gradlew assembleDebug"
   },
   "dependencies": {
-    "@capacitor/core": "^8.0.0"
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/app": "^8.0.0",
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/push-notifications": "^8.0.0"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.0.0",
-    "@capacitor/android": "^8.0.0",
-    "typescript": "^5.9.2"
+    "vite": "^7.1.7"
   }
 }
