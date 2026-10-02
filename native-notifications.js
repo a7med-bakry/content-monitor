@@ -49,7 +49,7 @@ if (native) {
           title: String(title),
           body: String(options.body || ""),
           schedule: { at: new Date(Date.now() + 100) },
-          channelId: "content_monitor_alerts_v4", sound: "alert_siren"
+          channelId: "content_monitor_alerts_silent", sound: "alert_siren"
         }]
       }).catch((error) => console.error("Local notification failed", error));
     }
