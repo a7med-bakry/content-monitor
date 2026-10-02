@@ -83,4 +83,4 @@ document.querySelector("#alertStartMinute").onchange=updateRulePreview;
 document.querySelector("#alertEndMinute").onchange=updateRulePreview;
 document.querySelector("#alertWindowHours").onchange=updateRulePreview;
 document.querySelector("#minViews").oninput=updateRulePreview;
-loadReels();checkAlerts();setIntervalloadReels();checkAlerts();setInterval(()=>{loadReels();checkAlerts();},60000);
+loadReels();checkAlerts();setInterval(()=>{loadReels();checkAlerts();},60000);
