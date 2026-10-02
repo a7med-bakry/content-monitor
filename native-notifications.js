@@ -1,8 +1,6 @@
 import { Capacitor } from "@capacitor/core";
 import { PushNotifications } from "@capacitor/push-notifications";
 import { LocalNotifications } from "@capacitor/local-notifications";
-import { registerPlugin } from "@capacitor/core";
-const ContentMonitorNotifications = registerPlugin("ContentMonitorNotifications");
 
 const native = Capacitor.isNativePlatform();
 
@@ -15,12 +13,34 @@ async function setupNativeNotifications() {
       return false;
     }
     await LocalNotifications.requestPermissions();
-    await PushNotifications.addListener("registration", (token) => {
+    await PushNotifications.addListener("registration", async (token) => {
       localStorage.setItem("nativePushToken", token.value);
-      fetch("https://rwnesehhsblejmrbzzsu.supabase.co/functions/v1/reel-api",{method:"POST",headers:{"Content-Type":"text/plain"},body:JSON.stringify({action:"register_push",token:token.value,platform:"android"})}).catch(()=>{});
+      try {
+        await fetch("https://rwnesehhsblejmrbzzsu.supabase.co/functions/v1/reel-api", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({action:"register_push",token:token.value,platform:"android"})
+        });
+      } catch {}
     });
     await PushNotifications.addListener("registrationError", (error) => {
       console.error("Push registration error", error);
+    });
+    await PushNotifications.addListener("pushNotificationReceived", async (notification) => {
+      try {
+        await LocalNotifications.schedule({
+          notifications: [{
+            id: Math.floor(Date.now() % 2147483000),
+            title: String(notification.title || "Content Monitor"),
+            body: String(notification.body || ""),
+            schedule: { at: new Date(Date.now() + 100) },
+            channelId: "content_monitor_alerts",
+            extra: notification.data || {}
+          }]
+        });
+      } catch (error) {
+        console.error("Foreground notification failed", error);
+      }
     });
     await PushNotifications.register();
     localStorage.setItem("nativeNotificationsEnabled", "1");
@@ -49,16 +69,10 @@ if (native) {
           title: String(title),
           body: String(options.body || ""),
           schedule: { at: new Date(Date.now() + 100) },
-          channelId: "content_monitor_alerts_silent", sound: "alert_siren"
+          channelId: "content_monitor_alerts"
         }]
       }).catch((error) => console.error("Local notification failed", error));
     }
   };
   window.Notification.permission = localStorage.getItem("nativeNotificationsEnabled") === "1" ? "granted" : "default";
 }
-
-window.contentMonitorNative = window.contentMonitorNative || {};
-window.contentMonitorNative.chooseAlertSound = async()=>ContentMonitorNotifications.pickNotificationSound();
-window.contentMonitorNative.getAlertSound = async()=>ContentMonitorNotifications.getNotificationSound();
-window.contentMonitorNative.notify = async(title,body)=>ContentMonitorNotifications.notifyAlert({title,body});
-window.contentMonitorNative.playAlertSound = async()=>ContentMonitorNotifications.playAlertSound();
