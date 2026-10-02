@@ -175,7 +175,11 @@ jobs:
               pos=s.rfind('</application>')
               if pos<0: raise SystemExit('application tag not found')
               s=s[:pos]+"        "+meta+"\n    "+s[pos:]
-              p.write_text(s)
+          if 'android.permission.POST_NOTIFICATIONS' not in s:
+              pos=s.find('<application')
+              if pos<0: raise SystemExit('application tag not found')
+              s=s[:pos]+'    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    '+s[pos:]
+          p.write_text(s)
           PY
       - name: Register TikTok deep link
         run: |
