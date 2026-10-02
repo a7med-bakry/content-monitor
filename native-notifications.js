@@ -1,6 +1,8 @@
 import { Capacitor } from "@capacitor/core";
 import { PushNotifications } from "@capacitor/push-notifications";
 import { LocalNotifications } from "@capacitor/local-notifications";
+import { registerPlugin } from "@capacitor/core";
+const ContentMonitorNotifications = registerPlugin("ContentMonitorNotifications");
 
 const native = Capacitor.isNativePlatform();
 
@@ -15,6 +17,7 @@ async function setupNativeNotifications() {
     await LocalNotifications.requestPermissions();
     await PushNotifications.addListener("registration", (token) => {
       localStorage.setItem("nativePushToken", token.value);
+      fetch("https://rwnesehhsblejmrbzzsu.supabase.co/functions/v1/reel-api",{method:"POST",headers:{"Content-Type":"text/plain"},body:JSON.stringify({action:"register_push",token:token.value,platform:"android"})}).catch(()=>{});
     });
     await PushNotifications.addListener("registrationError", (error) => {
       console.error("Push registration error", error);
@@ -46,10 +49,15 @@ if (native) {
           title: String(title),
           body: String(options.body || ""),
           schedule: { at: new Date(Date.now() + 100) },
-          sound: "default"
+          channelId: "content_monitor_alerts", sound: "default"
         }]
       }).catch((error) => console.error("Local notification failed", error));
     }
   };
   window.Notification.permission = localStorage.getItem("nativeNotificationsEnabled") === "1" ? "granted" : "default";
 }
+
+window.contentMonitorNative = window.contentMonitorNative || {};
+window.contentMonitorNative.chooseAlertSound = async()=>ContentMonitorNotifications.pickNotificationSound();
+window.contentMonitorNative.getAlertSound = async()=>ContentMonitorNotifications.getNotificationSound();
+window.contentMonitorNative.notify = async(title,body)=>ContentMonitorNotifications.notifyAlert({title,body});
