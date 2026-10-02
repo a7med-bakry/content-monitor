@@ -117,11 +117,13 @@ async function showMonitoring(id){
   const startMin=Number(r.alert_window_start_minute??1),endMin=Number(r.alert_window_end_minute??15),repeat=Math.max(1,Number(r.alert_repeat_minutes||60)),minViews=Math.max(1,Number(r.alert_min_views_increase||100));
   const snaps=history.slice().sort((a,b)=>new Date(a.captured_at)-new Date(b.captured_at));
   if(!snaps.length){body.innerHTML="<div class='empty'>No snapshots yet.</div>";return;}
-  const base=new Date(r.monitor_start_at||snaps[0].captured_at),latest=new Date(snaps[snaps.length-1].captured_at),windows=[];
-  const first=new Date(base); first.setSeconds(0,0); first.setMinutes(startMin); if(first.getTime()<base.getTime()-60000)first.setTime(first.getTime()+3600000);
+  const latest=new Date(snaps[snaps.length-1].captured_at),windows=[];
+  const duration=(endMin-startMin)*60000;
+  let first=r.alert_anchor_at?new Date(r.alert_anchor_at):null;
+  if(!first||!Number.isFinite(first.getTime())){first=new Date(r.monitor_start_at||snaps[0].captured_at);first.setSeconds(0,0);first.setMinutes(startMin);if(first.getTime()<new Date(r.monitor_start_at||snaps[0].captured_at).getTime())first=new Date(first.getTime()+3600000);}
   let ws=new Date(first),guard=0;
   while(ws.getTime()<=latest.getTime()+repeat*60000&&guard++<500){
-   const we=new Date(ws.getTime()+(endMin-startMin)*60000);
+   const we=new Date(ws.getTime()+duration);
    const inside=snaps.filter(s=>{const t=new Date(s.captured_at).getTime();return t>=ws.getTime()&&t<=we.getTime();});
    if(inside.length)windows.push({ws:new Date(ws),we,inside});
    ws=new Date(ws.getTime()+repeat*60000);
