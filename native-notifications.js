@@ -52,6 +52,16 @@ async function setupNativeNotifications() {
   }
 }
 
+window.contentMonitorNative.testNotification = async()=>{
+  if(!native)return false;
+  try{
+    const ok=await setupNativeNotifications();
+    if(!ok)return false;
+    await LocalNotifications.schedule({notifications:[{id:Math.floor(Date.now()%2147483000),title:"Content Monitor",body:"Test notification is working.",schedule:{at:new Date(Date.now()+250)},channelId:"content_monitor_alerts",extra:{test:true}}]});
+    return true;
+  }catch(error){console.error("Test notification failed",error);return false;}
+};
+
 if (native) {
   window.Notification = class NativeNotification {
     static permission = localStorage.getItem("nativeNotificationsEnabled") === "1" ? "granted" : "default";
