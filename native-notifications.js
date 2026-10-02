@@ -61,3 +61,4 @@ window.contentMonitorNative = window.contentMonitorNative || {};
 window.contentMonitorNative.chooseAlertSound = async()=>ContentMonitorNotifications.pickNotificationSound();
 window.contentMonitorNative.getAlertSound = async()=>ContentMonitorNotifications.getNotificationSound();
 window.contentMonitorNative.notify = async(title,body)=>ContentMonitorNotifications.notifyAlert({title,body});
+window.contentMonitorNative.playAlertSound = async()=>ContentMonitorNotifications.playAlertSound();
