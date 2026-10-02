@@ -160,6 +160,16 @@ function playTone(kind=alertTone){
   (sets[kind]||sets.bell).forEach((f,i)=>{const t=now+i*.18,g=ctx.createGain(),o=ctx.createOscillator();g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.3,t+.02);g.gain.exponentialRampToValueAtTime(.0001,t+.5);o.frequency.value=f;o.connect(g);g.connect(ctx.destination);o.start(t);o.stop(t+.52);});
  }catch{}
 }
+function showInAppAlert(title,body,type="alert",contentId=""){
+ const old=document.querySelector(".in-app-alert");if(old)old.remove();
+ const el=document.createElement("button");
+ el.className="in-app-alert "+(type==="metric_drop"?"drop":type==="metric_spike"?"spike":"warning");
+ el.innerHTML="<span class='alert-symbol'>"+(type==="metric_drop"?"↓":type==="metric_spike"?"⚡":"!")+"</span><span class='alert-copy'><b>"+esc(title)+"</b><small>"+esc(body)+"</small></span><span class='alert-open'>›</span>";
+ el.onclick=()=>{el.remove();if(contentId){document.querySelector(".detail-modal")?.remove();showDetails(contentId);}};
+ document.body.appendChild(el);
+ requestAnimationFrame(()=>el.classList.add("show"));
+ setTimeout(()=>{el.classList.remove("show");setTimeout(()=>el.remove(),250)},9000);
+}
 async function loadAlertHistory(){
  const box=document.querySelector("#alertList"); if(!box)return;
  try{
@@ -167,15 +177,15 @@ async function loadAlertHistory(){
   if(!rows.length){box.innerHTML="<div class='empty'>No alerts yet.</div>";return;}
   box.innerHTML=rows.map(a=>{
    const metric=a.metric==="likes"?"Likes":a.metric==="comments"?"Comments":a.metric==="shares"?"Shares":"Views";
-   const drop=a.alert_type==="metric_drop";
-   const old=Number(drop?(a["previous_"+(a.metric||"views")]||0):a.previous_views||0);
-   const cur=Number(drop?(a["current_"+(a.metric||"views")]||0):a.current_views||0);
-   const msg=drop?metric+" dropped from "+old.toLocaleString()+" to "+cur.toLocaleString():"Views did not reach the required growth.";
+   const drop=a.alert_type==="metric_drop",spike=a.alert_type==="metric_spike";
+   const old=Number((drop||spike)?(a["previous_"+(a.metric||"views")]||0):a.previous_views||0);
+   const cur=Number((drop||spike)?(a["current_"+(a.metric||"views")]||0):a.current_views||0);
+   const msg=drop?metric+" dropped from "+old.toLocaleString()+" to "+cur.toLocaleString():spike?metric+" jumped unexpectedly from "+old.toLocaleString()+" to "+cur.toLocaleString():"Views did not reach the required growth.";
    return "<button class='alert-item' onclick='window.open("+JSON.stringify(a.url||"#")+",\'_blank\')'><b>"+esc(a.title||"Clip")+"</b><span>"+esc(fmt(a.created_at))+"</span><small>"+esc(msg)+"</small></button>";
   }).join("");
  }catch{box.innerHTML="<div class='empty'>Could not load alerts.</div>";}
 }
-async function checkAlerts(){try{const r=await api("alerts",{after_id:lastAlertId}),d=await r.json();if(!r.ok)return;const rows=Array.isArray(d)?d:[];for(const a of rows){if(Number(a.id)<=lastAlertId)continue;playTone();lastAlertId=Number(a.id);localStorage.setItem("lastAlertId",String(lastAlertId));const reel=reelsData.find(x=>String(x.id)===String(a.content_id));const title=reel?.title||"Reel";const required=Number(reel?.alert_min_views_increase||100);const drop=a.alert_type==="metric_drop",metric=a.metric||"views",label=metric==="likes"?"Likes":metric==="comments"?"Comments":metric==="shares"?"Shares":"Views";const body=drop?(label+" dropped from "+Number(a["previous_"+metric]||0).toLocaleString()+" to "+Number(a["current_"+metric]||0).toLocaleString()):("Views increased by "+Number(Number(a.current_views||0)-Number(a.previous_views||0)).toLocaleString()+" (required "+required.toLocaleString()+")");if("Notification"in window&&Notification.permission==="granted")new Notification("⚠️ "+title,{body});else alert("⚠️ " + title + " | " + body);}if(rows.length)loadReels();}catch{}}
+async function checkAlerts(){try{const r=await api("alerts",{after_id:lastAlertId}),d=await r.json();if(!r.ok)return;const rows=Array.isArray(d)?d:[];for(const a of rows){if(Number(a.id)<=lastAlertId)continue;playTone();lastAlertId=Number(a.id);localStorage.setItem("lastAlertId",String(lastAlertId));const reel=reelsData.find(x=>String(x.id)===String(a.content_id));const title=reel?.title||"Reel";const required=Number(reel?.alert_min_views_increase||100);const drop=a.alert_type==="metric_drop",spike=a.alert_type==="metric_spike",metric=a.metric||"views",label=metric==="likes"?"Likes":metric==="comments"?"Comments":metric==="shares"?"Shares":"Views";const old=Number(a["previous_"+metric]||0),cur=Number(a["current_"+metric]||0);const body=drop?(label+" dropped from "+old.toLocaleString()+" to "+cur.toLocaleString()):spike?(label+" jumped unexpectedly from "+old.toLocaleString()+" to "+cur.toLocaleString()):("Views increased by "+Number(Number(a.current_views||0)-Number(a.previous_views||0)).toLocaleString()+" (required "+required.toLocaleString()+")");showInAppAlert((drop?"DROP · ":spike?"SPIKE · ":"ALERT · ")+title,body,a.alert_type,a.content_id);if("Notification"in window&&Notification.permission==="granted")new Notification((drop?"⚠️ ":spike?"⚡ ":"⚠️ ")+title,{body});}if(rows.length){loadReels();loadAlertHistory();}}catch{}}
 
 async function setupNotifications(){if(!("Notification"in window)){alert("Notifications are not supported here.");return;}const p=Notification.permission==="granted"?"granted":await Notification.requestPermission();if(p==="granted")alert("Notifications enabled. Android can deliver alerts even when the app is closed.");}
 
@@ -219,4 +229,4 @@ document.querySelector("#alertStartMinute").onchange=updateRulePreview;
 document.querySelector("#alertEndMinute").onchange=updateRulePreview;
 
 document.querySelector("#minViews").oninput=updateRulePreview;document.querySelector("#alertRepeatMinutes").oninput=updateRulePreview;
-loadReels().then(()=>openClipRoute());checkAlerts();setInterval(()=>{loadReels();checkAlerts();},60000);
+loadReels().then(()=>openClipRoute());checkAlerts();setInterval(()=>{checkAlerts();},15000);setInterval(()=>{loadReels();},60000);
