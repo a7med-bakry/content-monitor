@@ -2,6 +2,17 @@ name: Android APK
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - "app.js"
+      - "index.html"
+      - "styles.css"
+      - "manifest.json"
+      - "service-worker.js"
+      - "capacitor.config.ts"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/android-apk.yml"
 
 permissions:
   contents: read
