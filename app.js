@@ -34,7 +34,8 @@ async function editMonitoring(id){
  body.querySelector("#editRepeat").value=String(Number(r.alert_repeat_minutes||60));body.querySelector("#editMin").value=String(Number(r.alert_min_views_increase||100));
  body.querySelector("#editClose").onclick=()=>body.remove();
  body.querySelector("#editSave").onclick=async()=>{
-  const btn=body.querySelector("#editSave"),wmStart=Number(sm.value),wmEnd=Number(em.value),repeat=Number(body.querySelector("#editRepeat").value);\n  if(repeat<1){alert("Repeat must be at least 1 minute.");return;}
+  const btn=body.querySelector("#editSave"),wmStart=Number(sm.value),wmEnd=Number(em.value),repeat=Number(body.querySelector("#editRepeat").value);
+  if(repeat<1){alert("Repeat must be at least 1 minute.");return;}
   if(wmEnd<=wmStart){alert("The end minute must be after the start minute.");return;}
   btn.disabled=true;btn.textContent="Saving...";
   try{
