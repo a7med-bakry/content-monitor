@@ -329,7 +329,8 @@ window.deleteAllAlerts=deleteAllAlerts;
 
 async function checkAlerts(){try{const r=await api("alerts",{after_id:lastAlertId}),d=await r.json();if(!r.ok)return;const rows=Array.isArray(d)?d:[];for(const a of rows){if(Number(a.id)<=lastAlertId)continue;playTone();lastAlertId=Number(a.id);localStorage.setItem("lastAlertId",String(lastAlertId));const reel=reelsData.find(x=>String(x.id)===String(a.content_id));const title=reel?.title||"Reel";const required=Number(reel?.alert_min_views_increase||100);const drop=a.alert_type==="metric_drop",spike=a.alert_type==="metric_spike",growth=a.alert_type==="low_views_growth",metric=a.metric||"views",label=metric==="likes"?"Likes":metric==="comments"?"Comments":metric==="shares"?"Shares":"Views";const old=Number(a["previous_"+metric]||0),cur=Number(a["current_"+metric]||0);const body=drop?(label+" dropped from "+old.toLocaleString()+" to "+cur.toLocaleString()):spike?(label+" jumped unexpectedly from "+old.toLocaleString()+" to "+cur.toLocaleString()):("Views increased by "+Number(cur-old).toLocaleString()+" (required "+required.toLocaleString()+")");showInAppAlert((drop?"DROP · ":spike?"SPIKE · ":growth?"NOT MET · ":"ALERT · ")+title,body,drop?"metric_drop":spike?"metric_spike":"low_views_growth",a.content_id);if("Notification"in window&&Notification.permission==="granted")new Notification((drop?"⚠️ ":spike?"⚡ ":"⚠️ ")+title,{body});}if(rows.length){loadReels();loadAlertHistory();}}catch{}}
 
-async function setupNotifications(){if(!("Notification"in window)){alert("Notifications are not supported here.");return;}const p=Notification.permission==="granted"?"granted":await Notification.requestPermission();if(p==="granted")alert("Notifications enabled. Android can deliver alerts even when the app is closed.");}
+async function ensureNotificationWorker(){if(!("serviceWorker"in navigator))throw new Error("Service Worker is not supported in this browser.");const reg=await navigator.serviceWorker.register("/service-worker.js?v=36",{scope:"/"});await navigator.serviceWorker.ready;return reg;}
+async function setupNotifications(){try{if(!("Notification"in window)){alert("Notifications are not supported here.");return;}await ensureNotificationWorker();const p=Notification.permission==="granted"?"granted":await Notification.requestPermission();if(p==="granted")alert("Notifications enabled. Your phone/browser default notification sound will be used.");else alert("Please allow notifications in your browser settings.");}catch(e){alert("Could not enable notifications. Please refresh and try again.");}}
 
 document.addEventListener("pointerdown",unlockAlertSound,{once:true});
 document.querySelector("#addBtn").onclick=()=>{unlockAlertSound();openRoute("/add");};
@@ -359,21 +360,23 @@ if(window.contentMonitorNative?.getAlertSound)window.contentMonitorNative.getAle
 const test=document.querySelector("#testAlarm");
 if(test)test.onclick=async()=>{
   try{
-    if("Notification" in window){
-      if(Notification.permission!=="granted"){
-        const p=await Notification.requestPermission();
-        if(p!=="granted")return alert("Please allow notifications from your phone/browser.");
-      }
-      new Notification("Content Monitor",{
-        body:"Test notification — your phone's default notification sound will be used.",
-        tag:"content-monitor-test",
-        renotify:true
-      });
-    }else{
-      alert("Notifications are not supported in this browser.");
+    if(!("Notification"in window)){alert("Notifications are not supported here.");return;}
+    const reg=await ensureNotificationWorker();
+    if(Notification.permission!=="granted"){
+      const p=await Notification.requestPermission();
+      if(p!=="granted")return alert("Please allow notifications in your browser settings.");
     }
+    await reg.showNotification("Content Monitor",{
+      body:"Test notification — using your phone/browser default notification sound.",
+      tag:"content-monitor-test-"+Date.now(),
+      renotify:true,
+      silent:false,
+      vibrate:[200,100,200],
+      data:{url:"/"}
+    });
   }catch(e){
-    alert("Could not send test notification.");
+    console.error("Test notification failed",e);
+    alert("Could not send test notification. Please refresh the page and allow notifications.");
   }
 };const ab=document.querySelector("#alertsBtn");if(ab)ab.onclick=()=>openRoute("/alerts");const ac=document.querySelector("#alertsClose");if(ac)ac.onclick=()=>{document.querySelector("#alertsModal")?.classList.add("hidden");goHome();};
 document.querySelector("#enableNotifications").onclick=()=>{unlockAlertSound();setupNotifications();};
