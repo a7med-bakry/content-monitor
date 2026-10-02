@@ -144,7 +144,26 @@ document.querySelector("#refreshBtn").onclick=loadReels;
 document.querySelector("#homeBtn").onclick=loadReels;
 document.querySelector("#settingsBtn").onclick=()=>settingsModal.classList.remove("hidden");
 document.querySelector("#settingsClose").onclick=()=>settingsModal.classList.add("hidden");
-const tone=document.querySelector("#alarmTone");if(tone){tone.value=alertTone;tone.onchange=()=>{alertTone=tone.value;localStorage.setItem("alertTone",alertTone);};}const test=document.querySelector("#testAlarm");if(test)test.onclick=()=>playTone();const ab=document.querySelector("#alertsBtn");if(ab)ab.onclick=()=>{document.querySelector("#alertsModal")?.classList.remove("hidden");loadAlertHistory();};const ac=document.querySelector("#alertsClose");if(ac)ac.onclick=()=>document.querySelector("#alertsModal")?.classList.add("hidden");
+const tone=document.querySelector("#alarmTone");
+if(tone){tone.value=alertTone;tone.onchange=()=>{alertTone=tone.value;localStorage.setItem("alertTone",alertTone);};}
+const soundName=document.querySelector("#alarmToneName");
+const chooseSound=document.querySelector("#chooseAlarmTone");
+if(chooseSound)chooseSound.onclick=async()=>{
+  if(window.contentMonitorNative?.chooseAlertSound){
+    const r=await window.contentMonitorNative.chooseAlertSound();
+    if(r&&soundName)soundName.textContent=r.name||"Default Android sound";
+    else if(soundName)soundName.textContent="Default Android sound";
+  }else{
+    alert("Phone sound selection is available in the Android app.");
+  }
+};
+if(window.contentMonitorNative?.getAlertSound)window.contentMonitorNative.getAlertSound().then(r=>{if(r&&soundName)soundName.textContent=r.name||"Default Android sound";});
+const test=document.querySelector("#testAlarm");
+if(test)test.onclick=async()=>{
+  if(window.contentMonitorNative?.notify){
+    await window.contentMonitorNative.notify("Content Monitor","Test alert sound");
+  }else playTone();
+};const ab=document.querySelector("#alertsBtn");if(ab)ab.onclick=()=>{document.querySelector("#alertsModal")?.classList.remove("hidden");loadAlertHistory();};const ac=document.querySelector("#alertsClose");if(ac)ac.onclick=()=>document.querySelector("#alertsModal")?.classList.add("hidden");
 document.querySelector("#enableNotifications").onclick=()=>{unlockAlertSound();setupNotifications();};
 document.querySelector("#url").addEventListener("input",()=>{const p=detectPlatform(document.querySelector("#url").value),el=document.querySelector("#platformDetected");el.classList.toggle("hidden",!p);el.textContent=p==="tiktok"?"✓ TikTok detected":"✓ Instagram detected";});
 const minuteOptions=Array.from({length:59},(_,i)=>"<option value='"+i+"'>"+i+"</option>").join("");
