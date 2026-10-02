@@ -103,7 +103,7 @@ jobs:
               public void pickNotificationSound(PluginCall call) {
                   Uri existing = getSavedSound();
                   Intent intent = new Intent(RingtoneManager.ACTION_RINGTONE_PICKER);
-                  intent.putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_NOTIFICATION);
+                  intent.putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_RINGTONE);
                   intent.putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Choose alert sound");
                   intent.putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true);
                   intent.putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, existing);
@@ -161,7 +161,7 @@ jobs:
                   Context context = getContext();
                   NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
                   Uri sound = getSavedSound();
-                  String channelId = "content_monitor_alerts_" + Integer.toHexString(sound == null ? 0 : sound.toString().hashCode());
+                  String channelId = "content_monitor_alerts";
           
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                       NotificationChannel channel = manager.getNotificationChannel(channelId);
@@ -215,6 +215,19 @@ jobs:
           
           JAVA
 
+      - name: Set FCM default notification channel
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("android/app/src/main/AndroidManifest.xml")
+          s=p.read_text()
+          meta='<meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="content_monitor_alerts" />'
+          if 'com.google.firebase.messaging.default_notification_channel_id' not in s:
+              pos=s.rfind('</application>')
+              if pos<0: raise SystemExit('application tag not found')
+              s=s[:pos]+"        "+meta+"\n    "+s[pos:]
+              p.write_text(s)
+          PY
       - name: Register TikTok deep link
         run: |
           python3 - <<'PY'
