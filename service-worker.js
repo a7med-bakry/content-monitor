@@ -1,5 +1,5 @@
-const CACHE_NAME = "content-monitor-v11";
-const ASSETS = ["./","./index.html","./styles.css?v=2","./app.js?v=22","./manifest.json"];
+const CACHE_NAME = "content-monitor-v12";
+const ASSETS = ["./","./index.html","./styles.css?v=2","./app.js?v=36","./manifest.json"];
 
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
@@ -28,6 +28,8 @@ self.addEventListener("push", event => {
     body:data.body || "A monitored clip needs your attention.",
     tag:data.tag || "content-monitor-alert",
     renotify:true,
+    silent:false,
+    vibrate:[200,100,200],
     data:{url:data.url || "./"}
   };
   event.waitUntil(self.registration.showNotification(title,options));
