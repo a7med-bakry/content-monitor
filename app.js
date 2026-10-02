@@ -128,11 +128,11 @@ async function showMonitoring(id){
    if(inside.length)windows.push({ws:new Date(ws),we,inside});
    ws=new Date(ws.getTime()+repeat*60000);
   }
-  if(!windows.length){body.innerHTML="<div class='empty'>No snapshots have been captured inside a monitoring window yet.</div>";return;}
+  if(!windows.length){body.innerHTML="<div class='empty'>No monitoring windows have started yet.</div>";return;}
   body.innerHTML="<div class='monitor-summary'><span>Window "+startMin+"–"+endMin+" · every "+repeat+" min</span><b>Minimum increase: "+minViews.toLocaleString()+" views</b></div>"+windows.map((w,i)=>{
-   const firstS=w.inside[0],lastS=w.inside[w.inside.length-1],delta=w.inside.length>1?Number(lastS.views||0)-Number(firstS.views||0):0,complete=Date.now()>w.we.getTime(),pass=delta>=minViews,status=complete?(pass?"pass":"fail"):"pending";
+   const firstS=w.inside[0],lastS=w.inside[w.inside.length-1],hasData=w.inside.length>0,delta=w.inside.length>1?Number(lastS.views||0)-Number(firstS.views||0):0,complete=Date.now()>w.we.getTime(),pass=hasData&&delta>=minViews,status=!hasData?"nodata":complete?(pass?"pass":"fail"):"pending";
    const snapsHtml=w.inside.map((s,j)=>{const prev=j?w.inside[j-1]:null,d=prev?Number(s.views||0)-Number(prev.views||0):0;return "<div class='monitor-snap'><span>"+esc(fmt(s.captured_at))+"</span><b>"+Number(s.views||0).toLocaleString()+"</b><em class='"+(d>=0?"up":"down")+"'>"+(prev?(d>=0?"+":"")+d.toLocaleString()+" views":"start")+"</em></div>"}).join("");
-   return "<div class='monitor-row'><div class='monitor-row-top'><div class='monitor-number'>"+(i+1)+"</div><div class='monitor-period'><b>"+esc(fmt(w.ws))+" → "+esc(fmt(w.we))+"</b><small>"+w.inside.length+" snapshots</small></div><div class='monitor-status "+status+"'>"+(complete?(pass?"PASS":"NOT MET"):"IN PROGRESS")+"</div></div><div class='monitor-result'><span>Views increase</span><strong>"+(delta>=0?"+":"")+delta.toLocaleString()+"</strong><small>required ≥ "+minViews.toLocaleString()+"</small></div><div class='monitor-snaps'>"+snapsHtml+"</div></div>";
+   return "<div class='monitor-row'><div class='monitor-row-top'><div class='monitor-number'>"+(i+1)+"</div><div class='monitor-period'><b>"+esc(fmt(w.ws))+" → "+esc(fmt(w.we))+"</b><small>"+w.inside.length+" snapshots</small></div><div class='monitor-status "+status+"'>"+(!hasData?"NO DATA":complete?(pass?"PASS":"NOT MET"):"IN PROGRESS")+"</div></div><div class='monitor-result'><span>Views increase</span><strong>"+(hasData?(delta>=0?"+":"")+delta.toLocaleString():"—")+"</strong><small>"+(hasData?"required ≥ "+minViews.toLocaleString():"Waiting for snapshots in this window")+"</small></div><div class='monitor-snaps'>"+(snapsHtml||"<div class='empty' style='padding:16px'>No snapshots in this window yet.</div>")+"</div></div>";
   }).join("");
  };
  const renderDrops=()=>{
