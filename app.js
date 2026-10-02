@@ -62,11 +62,48 @@ function updateSummary(){document.querySelector("#total").textContent=reelsData.
 
 async function loadReels(){try{const r=await api("list"),d=await r.json();if(!r.ok)throw new Error(d.error||"Failed to load Reels");reelsData=Array.isArray(d)?d:[];render();}catch(e){reels.innerHTML="<div class='empty'>Could not load Reels.<br><br>"+esc(e.message||e)+"</div>";}}
 function render(){updateSummary();if(!reelsData.length){reels.innerHTML="<div class='empty'>No Reels yet.<br><br>Tap ＋ to add your first Reel.</div>";return;}reels.innerHTML=reelsData.map(r=>{const[st]=state(r),p=r.platform,paused=r.active===false;const icon=p==="tiktok"?"♪":"◎";const cls=p==="tiktok"?"tiktok":"instagram";const views=r.latest_views==null?"—":Number(r.latest_views).toLocaleString(),likes=r.latest_likes==null?"—":Number(r.latest_likes).toLocaleString();return "<button class='reel-row' onclick='showDetails("+JSON.stringify(String(r.id))+")'><div class='platform-icon "+cls+"'>"+icon+"</div><div class='reel-main'><div class='reel-name'>"+esc(r.title||"Untitled Reel")+"</div><div class='reel-platform'>"+(p==="tiktok"?"TikTok":"Instagram")+"</div></div><div class='reel-stats'><div class='mini-stat views-stat'><span class='mini-icon'>▶</span><div><strong>"+views+"</strong></div></div><div class='mini-stat likes-stat'><span class='mini-icon'>♥</span><div><strong>"+likes+"</strong></div></div></div><div class='status-dot "+(paused?"muted":(st==="MONITORED"?"good":"muted"))+"'></div><div class='chev'>›</div></button>";}).join("");}
-async function showDetails(id,fromRoute=false){const r=reelsData.find(x=>String(x.id)===String(id));if(!r)return;if(!fromRoute){history.pushState({clipId:String(id)},"",location.origin+"/clip/"+encodeURIComponent(String(id)));}const overlay=document.createElement("div");overlay.className="detail-modal";overlay.innerHTML="<div class='detail-sheet'><button class='close' id='detailClose'>×</button><div class='detail-head'><div class='platform-icon "+(r.platform==="tiktok"?"tiktok":"instagram")+"'>"+(r.platform==="tiktok"?"♪":"◎")+"</div><div><h2>"+esc(r.title||"Untitled Reel")+"</h2><div class='reel-platform'>"+(r.platform==="tiktok"?"TikTok":"Instagram")+" · <span class='green-text'>"+(state(r)[0]==="MONITORED"?"Monitoring":"Waiting")+"</span></div></div></div><div id='detailBody'><div class='loading'>Loading stats...</div></div></div>";document.body.appendChild(overlay);overlay.querySelector("#detailClose").onclick=()=>overlay.remove();try{const q=await api("history",{content_id:id}),rows=await q.json();if(!q.ok)throw new Error(rows.error||"Failed to load history");rows.reverse();const last=rows[rows.length-1]||{},views=Number(last.views||0),likes=Number(last.likes||0);const maxV=Math.max(1,...rows.map(x=>Number(x.views||0))),maxL=Math.max(1,...rows.map(x=>Number(x.likes||0)));const points=(key,max)=>rows.map((x,i)=>{const px=12+(i/(Math.max(1,rows.length-1)))*376,py=100-(Number(x[key]||0)/max)*82;return px.toFixed(1)+","+py.toFixed(1)}).join(" ");const snaps=rows.slice().reverse().map((s,i,a)=>{const prev=a[i+1],dv=prev?Number(s.views||0)-Number(prev.views||0):0,dl=prev?Number(s.likes||0)-Number(prev.likes||0):0;return "<div class='snap'><span>"+esc(fmt(s.captured_at))+"</span><b>"+Number(s.views||0).toLocaleString()+"</b><em class='"+(dv>=0?"up":"down")+"'>"+(dv>=0?"+":"")+dv.toLocaleString()+" views</em><b>"+Number(s.likes||0).toLocaleString()+"</b><em class='"+(dl>=0?"up":"down")+"'>"+(dl>=0?"+":"")+dl.toLocaleString()+" likes</em></div>"}).join("");overlay.querySelector("#detailBody").innerHTML="<div class='totals'><div><span>Total views</span><strong>"+views.toLocaleString()+"</strong></div><div><span>Total likes</span><strong>"+likes.toLocaleString()+"</strong></div></div><div class='chart-card'><div class='chart-title'>Views</div><svg viewBox='0 0 400 110' preserveAspectRatio='none'><polyline points='"+points("views",maxV)+"' fill='none' stroke='currentColor' stroke-width='3'/></svg></div><div class='chart-card likes-chart'><div class='chart-title'>Likes</div><svg viewBox='0 0 400 110' preserveAspectRatio='none'><polyline points='"+points("likes",maxL)+"' fill='none' stroke='currentColor' stroke-width='3'/></svg></div><div class='detail-actions'><button class='secondary' onclick='editMonitoring(" + JSON.stringify(String(r.id)) + ")'>Edit monitoring</button><a class='secondary' href='" + esc(r.url) + "' target='_blank' rel='noopener'>Open Reel</a><button class='secondary' onclick='copyClipLink("+JSON.stringify(String(r.id))+")'>Copy Link</button></div><div class='clip-management'><button class='secondary "+(r.active===false?"resume-clip":"pause-clip")+"' onclick='toggleMonitoring("+JSON.stringify(String(r.id))+","+(r.active!==false)+")'>"+(r.active===false?"Resume monitoring":"Stop monitoring")+"</button><button class='danger' onclick='deleteClip("+JSON.stringify(String(r.id))+")'>Delete clip</button></div><div class='alert-info'><b>How alerts work</b><br>After each window starts, the system waits the selected delay. If views did not increase by your minimum amount, an alert is created. The same check repeats using your selected repeat time.</div><h3 class='snap-title'>Snapshots</h3><div class='snapshots'>"+(snaps||"<div class='empty'>No snapshots yet.</div>")+"</div>";}catch(e){overlay.querySelector("#detailBody").innerHTML="<div class='empty'>Failed to load stats.<br><br>"+esc(e.message||e)+"</div>";}}
+async function showDetails(id,fromRoute=false){const r=reelsData.find(x=>String(x.id)===String(id));if(!r)return;if(!fromRoute){history.pushState({clipId:String(id)},"",location.origin+"/clip/"+encodeURIComponent(String(id)));}const overlay=document.createElement("div");overlay.className="detail-modal";overlay.innerHTML="<div class='detail-sheet'><button class='close' id='detailClose'>×</button><div class='detail-head'><div class='platform-icon "+(r.platform==="tiktok"?"tiktok":"instagram")+"'>"+(r.platform==="tiktok"?"♪":"◎")+"</div><div><h2>"+esc(r.title||"Untitled Reel")+"</h2><div class='reel-platform'>"+(r.platform==="tiktok"?"TikTok":"Instagram")+" · <span class='green-text'>"+(state(r)[0]==="MONITORED"?"Monitoring":"Waiting")+"</span></div></div></div><div id='detailBody'><div class='loading'>Loading stats...</div></div></div>";document.body.appendChild(overlay);overlay.querySelector("#detailClose").onclick=()=>{overlay.remove();goHome();};try{const q=await api("history",{content_id:id}),rows=await q.json();if(!q.ok)throw new Error(rows.error||"Failed to load history");rows.reverse();const last=rows[rows.length-1]||{},views=Number(last.views||0),likes=Number(last.likes||0);const maxV=Math.max(1,...rows.map(x=>Number(x.views||0))),maxL=Math.max(1,...rows.map(x=>Number(x.likes||0)));const points=(key,max)=>rows.map((x,i)=>{const px=12+(i/(Math.max(1,rows.length-1)))*376,py=100-(Number(x[key]||0)/max)*82;return px.toFixed(1)+","+py.toFixed(1)}).join(" ");const snaps=rows.slice().reverse().map((s,i,a)=>{const prev=a[i+1],dv=prev?Number(s.views||0)-Number(prev.views||0):0,dl=prev?Number(s.likes||0)-Number(prev.likes||0):0;return "<div class='snap'><span>"+esc(fmt(s.captured_at))+"</span><b>"+Number(s.views||0).toLocaleString()+"</b><em class='"+(dv>=0?"up":"down")+"'>"+(dv>=0?"+":"")+dv.toLocaleString()+" views</em><b>"+Number(s.likes||0).toLocaleString()+"</b><em class='"+(dl>=0?"up":"down")+"'>"+(dl>=0?"+":"")+dl.toLocaleString()+" likes</em></div>"}).join("");overlay.querySelector("#detailBody").innerHTML="<div class='totals'><div><span>Total views</span><strong>"+views.toLocaleString()+"</strong></div><div><span>Total likes</span><strong>"+likes.toLocaleString()+"</strong></div></div><div class='chart-card'><div class='chart-title'>Views</div><svg viewBox='0 0 400 110' preserveAspectRatio='none'><polyline points='"+points("views",maxV)+"' fill='none' stroke='currentColor' stroke-width='3'/></svg></div><div class='chart-card likes-chart'><div class='chart-title'>Likes</div><svg viewBox='0 0 400 110' preserveAspectRatio='none'><polyline points='"+points("likes",maxL)+"' fill='none' stroke='currentColor' stroke-width='3'/></svg></div><div class='detail-actions'><button class='secondary' onclick='editMonitoring(" + JSON.stringify(String(r.id)) + ")'>Edit monitoring</button><a class='secondary' href='" + esc(r.url) + "' target='_blank' rel='noopener'>Open Reel</a><button class='secondary' onclick='copyClipLink("+JSON.stringify(String(r.id))+")'>Copy Link</button></div><div class='clip-management'><button class='secondary "+(r.active===false?"resume-clip":"pause-clip")+"' onclick='toggleMonitoring("+JSON.stringify(String(r.id))+","+(r.active!==false)+")'>"+(r.active===false?"Resume monitoring":"Stop monitoring")+"</button><button class='danger' onclick='deleteClip("+JSON.stringify(String(r.id))+")'>Delete clip</button></div><div class='alert-info'><b>How alerts work</b><br>After each window starts, the system waits the selected delay. If views did not increase by your minimum amount, an alert is created. The same check repeats using your selected repeat time.</div><h3 class='snap-title'>Snapshots</h3><div class='snapshots'>"+(snaps||"<div class='empty'>No snapshots yet.</div>")+"</div>";}catch(e){overlay.querySelector("#detailBody").innerHTML="<div class='empty'>Failed to load stats.<br><br>"+esc(e.message||e)+"</div>";}}
 window.showDetails=showDetails;
-function routeClipId(){const m=location.pathname.match(/^\/clip\/([^/]+)\/?$/);return m?decodeURIComponent(m[1]):null;}
-window.addEventListener("popstate",()=>{const id=routeClipId();document.querySelector(".detail-modal")?.remove();if(id){if(reelsData.length)showDetails(id,true);else loadReels();}});
-async function openClipRoute(){const id=routeClipId();if(id){if(reelsData.length)showDetails(id,true);else await loadReels();}}
+function routeClipId(){const m=location.pathname.match(/^\\/clip\\/([^/]+)\\/?$/);return m?decodeURIComponent(m[1]):null;}
+function goHome(replace=false){const fn=replace?"replaceState":"pushState";history[fn]({route:"home"},"",location.origin+"/");document.querySelector(".detail-modal")?.remove();}
+function openRoute(route,replace=false){
+ const fn=replace?"replaceState":"pushState";
+ history[fn]({route},"",location.origin+route);
+ document.querySelector(".detail-modal")?.remove();
+ if(route==="/")return;
+ if(route==="/add"){openModal();return;}
+ if(route==="/settings"){settingsModal.classList.remove("hidden");return;}
+ if(route==="/alerts"){document.querySelector("#alertsModal")?.classList.remove("hidden");loadAlertHistory();return;}
+ const id=routeClipId();
+ if(id){showDetails(id,true);return;}
+ goHome(true);
+}
+window.addEventListener("popstate",()=>{
+ document.querySelector(".detail-modal")?.remove();
+ document.querySelector("#modal")?.classList.add("hidden");
+ settingsModal?.classList.add("hidden");
+ document.querySelector("#alertsModal")?.classList.add("hidden");
+ if(location.pathname==="/")return;
+ if(location.pathname==="/add"){openModal();return;}
+ if(location.pathname==="/settings"){settingsModal?.classList.remove("hidden");return;}
+ if(location.pathname==="/alerts"){document.querySelector("#alertsModal")?.classList.remove("hidden");loadAlertHistory();return;}
+ const id=routeClipId();
+ if(id){if(reelsData.length)showDetails(id,true);else loadReels().then(()=>showDetails(id,true));}
+ else goHome(true);
+});
+async function openClipRoute(){
+ const p=location.pathname.replace(/\\/$/,"")||"/";
+ if(p==="/")return;
+ if(p==="/add"){openModal();return;}
+ if(p==="/settings"){settingsModal.classList.remove("hidden");return;}
+ if(p==="/alerts"){document.querySelector("#alertsModal")?.classList.remove("hidden");loadAlertHistory();return;}
+ const id=routeClipId();
+ if(id){
+  if(reelsData.length)showDetails(id,true);
+  else {await loadReels();showDetails(id,true);}
+  if(!reelsData.some(x=>String(x.id)===String(id)))goHome(true);
+ }else goHome(true);
+}
 
 async function editMonitoring(id){
  const r=reelsData.find(x=>String(x.id)===String(id));if(!r)return;
@@ -143,16 +180,16 @@ async function checkAlerts(){try{const r=await api("alerts",{after_id:lastAlertI
 async function setupNotifications(){if(!("Notification"in window)){alert("Notifications are not supported here.");return;}const p=Notification.permission==="granted"?"granted":await Notification.requestPermission();if(p==="granted")alert("Notifications enabled. Android can deliver alerts even when the app is closed.");}
 
 document.addEventListener("pointerdown",unlockAlertSound,{once:true});
-document.querySelector("#addBtn").onclick=()=>{unlockAlertSound();openModal();};
-const alertsBtn=document.querySelector("#alertsBtn");if(alertsBtn)alertsBtn.onclick=()=>{document.querySelector("#alertsModal")?.classList.remove("hidden");loadAlertHistory();};
-const alertsClose=document.querySelector("#alertsClose");if(alertsClose)alertsClose.onclick=()=>document.querySelector("#alertsModal")?.classList.add("hidden");
-document.querySelector("#newReel").onclick=openModal;
-document.querySelector("#closeBtn").onclick=closeModal;
+document.querySelector("#addBtn").onclick=()=>{unlockAlertSound();openRoute("/add");};
+const alertsBtn=document.querySelector("#alertsBtn");if(alertsBtn)alertsBtn.onclick=()=>openRoute("/alerts");
+const alertsClose=document.querySelector("#alertsClose");if(alertsClose)alertsClose.onclick=()=>{document.querySelector("#alertsModal")?.classList.add("hidden");goHome();};
+document.querySelector("#newReel").onclick=()=>openRoute("/add");
+document.querySelector("#closeBtn").onclick=()=>{closeModal();goHome();};
 document.querySelector("#saveBtn").onclick=addReel;
 document.querySelector("#refreshBtn").onclick=loadReels;
-document.querySelector("#homeBtn").onclick=loadReels;
-document.querySelector("#settingsBtn").onclick=()=>settingsModal.classList.remove("hidden");
-document.querySelector("#settingsClose").onclick=()=>settingsModal.classList.add("hidden");
+document.querySelector("#homeBtn").onclick=()=>{closeModal();settingsModal.classList.add("hidden");document.querySelector("#alertsModal")?.classList.add("hidden");goHome();loadReels();};
+document.querySelector("#settingsBtn").onclick=()=>openRoute("/settings");
+document.querySelector("#settingsClose").onclick=()=>{settingsModal.classList.add("hidden");goHome();};
 const tone=document.querySelector("#alarmTone");
 if(tone){tone.value=alertTone;tone.onchange=()=>{alertTone=tone.value;localStorage.setItem("alertTone",alertTone);};}
 const soundName=document.querySelector("#alarmToneName");
@@ -172,7 +209,7 @@ if(test)test.onclick=async()=>{
   if(window.contentMonitorNative?.notify){
     await window.contentMonitorNative.notify("Content Monitor","Test alert sound");
   }else playTone();
-};const ab=document.querySelector("#alertsBtn");if(ab)ab.onclick=()=>{document.querySelector("#alertsModal")?.classList.remove("hidden");loadAlertHistory();};const ac=document.querySelector("#alertsClose");if(ac)ac.onclick=()=>document.querySelector("#alertsModal")?.classList.add("hidden");
+};const ab=document.querySelector("#alertsBtn");if(ab)ab.onclick=()=>openRoute("/alerts");const ac=document.querySelector("#alertsClose");if(ac)ac.onclick=()=>{document.querySelector("#alertsModal")?.classList.add("hidden");goHome();};
 document.querySelector("#enableNotifications").onclick=()=>{unlockAlertSound();setupNotifications();};
 document.querySelector("#url").addEventListener("input",()=>{const p=detectPlatform(document.querySelector("#url").value),el=document.querySelector("#platformDetected");el.classList.toggle("hidden",!p);el.textContent=p==="tiktok"?"✓ TikTok detected":"✓ Instagram detected";});
 const minuteOptions=Array.from({length:59},(_,i)=>"<option value='"+i+"'>"+i+"</option>").join("");
