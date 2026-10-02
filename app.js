@@ -4,35 +4,6 @@ const API=SUPABASE_URL+"/functions/v1/reel-api";
 const VAPID_PUBLIC_KEY="BI4nAWrPOT2kwAyN5LkddZ7plyg79egQg33pZrV6EuFE6SJ8ORy_2Da0Fbk7Lu7VHOp6uDXELzkhGLJcYBk9uOo";
 let reelsData=[];
 let lastAlertId=Number(localStorage.getItem("lastAlertId")||0);
-let alertAudioContext=null;
-let alertTone=localStorage.getItem('alertTone')||'bell';
-
-let alertSoundUnlocked=false;
-let alertAudio=null;
-let alertAudioPrimed=false;
-
-async function unlockAlertSound(){return primeAlertAudio();}
-
-async function primeAlertAudio(){
- try{
-  if(!alertAudio)alertAudio=new Audio(ALERT_SOUND_DATA);
-  alertAudio.preload="auto";
-  alertAudio.loop=true;
-  alertAudio.volume=0;
-  alertAudio.muted=true;
-  await alertAudio.play();
-  alertAudio.pause();
-  alertAudio.currentTime=0;
-  alertAudio.muted=false;
-  alertAudio.volume=1;
-  alertAudioPrimed=true;
-  alertSoundUnlocked=true;
- }catch{}
-}
-
-["pointerdown","touchstart","keydown"].forEach(evt=>{
- document.addEventListener(evt,()=>{primeAlertAudio();},{passive:true,once:true});
-});
 function playAlertBell(){
  try{
   unlockAlertSound();
@@ -327,13 +298,12 @@ async function deleteAllAlerts(){
 }
 window.deleteAllAlerts=deleteAllAlerts;
 
-async function checkAlerts(){try{const r=await api("alerts",{after_id:lastAlertId}),d=await r.json();if(!r.ok)return;const rows=Array.isArray(d)?d:[];for(const a of rows){if(Number(a.id)<=lastAlertId)continue;playTone();lastAlertId=Number(a.id);localStorage.setItem("lastAlertId",String(lastAlertId));const reel=reelsData.find(x=>String(x.id)===String(a.content_id));const title=reel?.title||"Reel";const required=Number(reel?.alert_min_views_increase||100);const drop=a.alert_type==="metric_drop",spike=a.alert_type==="metric_spike",growth=a.alert_type==="low_views_growth",metric=a.metric||"views",label=metric==="likes"?"Likes":metric==="comments"?"Comments":metric==="shares"?"Shares":"Views";const old=Number(a["previous_"+metric]||0),cur=Number(a["current_"+metric]||0);const body=drop?(label+" dropped from "+old.toLocaleString()+" to "+cur.toLocaleString()):spike?(label+" jumped unexpectedly from "+old.toLocaleString()+" to "+cur.toLocaleString()):("Views increased by "+Number(cur-old).toLocaleString()+" (required "+required.toLocaleString()+")");showInAppAlert((drop?"DROP · ":spike?"SPIKE · ":growth?"NOT MET · ":"ALERT · ")+title,body,drop?"metric_drop":spike?"metric_spike":"low_views_growth",a.content_id);if("Notification"in window&&Notification.permission==="granted")new Notification((drop?"⚠️ ":spike?"⚡ ":"⚠️ ")+title,{body});}if(rows.length){loadReels();loadAlertHistory();}}catch{}}
+async function checkAlerts(){try{const r=await api("alerts",{after_id:lastAlertId}),d=await r.json();if(!r.ok)return;const rows=Array.isArray(d)?d:[];for(const a of rows){if(Number(a.id)<=lastAlertId)continue;lastAlertId=Number(a.id);localStorage.setItem("lastAlertId",String(lastAlertId));const reel=reelsData.find(x=>String(x.id)===String(a.content_id));const title=reel?.title||"Reel";const required=Number(reel?.alert_min_views_increase||100);const drop=a.alert_type==="metric_drop",spike=a.alert_type==="metric_spike",growth=a.alert_type==="low_views_growth",metric=a.metric||"views",label=metric==="likes"?"Likes":metric==="comments"?"Comments":metric==="shares"?"Shares":"Views";const old=Number(a["previous_"+metric]||0),cur=Number(a["current_"+metric]||0);const body=drop?(label+" dropped from "+old.toLocaleString()+" to "+cur.toLocaleString()):spike?(label+" jumped unexpectedly from "+old.toLocaleString()+" to "+cur.toLocaleString()):("Views increased by "+Number(cur-old).toLocaleString()+" (required "+required.toLocaleString()+")");showInAppAlert((drop?"DROP · ":spike?"SPIKE · ":growth?"NOT MET · ":"ALERT · ")+title,body,drop?"metric_drop":spike?"metric_spike":"low_views_growth",a.content_id);if("Notification"in window&&Notification.permission==="granted")new Notification((drop?"⚠️ ":spike?"⚡ ":"⚠️ ")+title,{body});}if(rows.length){loadReels();loadAlertHistory();}}catch{}}
 
 async function ensureNotificationWorker(){if(!("serviceWorker"in navigator))throw new Error("Service Worker is not supported in this browser.");const reg=await navigator.serviceWorker.register("/service-worker.js?v=36",{scope:"/"});await navigator.serviceWorker.ready;return reg;}
 async function setupNotifications(){try{const p=Notification.permission==="granted"?"granted":await Notification.requestPermission();if(p==="granted")alert("Notifications enabled. You can control the notification sound from your phone settings.");else alert("Please allow notifications in your phone settings.");}catch(e){alert("Could not enable notifications. Please try again.");}}
 
-document.addEventListener("pointerdown",unlockAlertSound,{once:true});
-document.querySelector("#addBtn").onclick=()=>{unlockAlertSound();openRoute("/add");};
+document.querySelector("#addBtn").onclick=()=>openRoute("/add");
 const alertsBtn=document.querySelector("#alertsBtn");if(alertsBtn)alertsBtn.onclick=()=>openRoute("/alerts");
 const alertsClose=document.querySelector("#alertsClose");if(alertsClose)alertsClose.onclick=()=>{document.querySelector("#alertsModal")?.classList.add("hidden");goHome();};
 document.querySelector("#newReel").onclick=()=>openRoute("/add");
@@ -358,28 +328,26 @@ if(chooseSound)chooseSound.onclick=async()=>{
 };
 if(window.contentMonitorNative?.getAlertSound)window.contentMonitorNative.getAlertSound().then(r=>{if(r&&soundName)soundName.textContent=r.name||"Default Android sound";});
 const test=document.querySelector("#testAlarm");
-if(test)test.onclick=async()=>{
-  try{
-    if(!("Notification"in window)){alert("Notifications are not supported here.");return;}
-    const reg=await ensureNotificationWorker();
-    if(Notification.permission!=="granted"){
-      const p=await Notification.requestPermission();
-      if(p!=="granted")return alert("Please allow notifications in your browser settings.");
-    }
-    await reg.showNotification("Content Monitor",{
-      body:"Test notification — using your phone/browser default notification sound.",
-      tag:"content-monitor-test-"+Date.now(),
-      renotify:true,
-      silent:false,
-      vibrate:[200,100,200],
-      data:{url:"/"}
-    });
-  }catch(e){
-    console.error("Test notification failed",e);
-    alert("Could not send test notification. Please refresh the page and allow notifications.");
-  }
-};const ab=document.querySelector("#alertsBtn");if(ab)ab.onclick=()=>openRoute("/alerts");const ac=document.querySelector("#alertsClose");if(ac)ac.onclick=()=>{document.querySelector("#alertsModal")?.classList.add("hidden");goHome();};
-document.querySelector("#enableNotifications").onclick=()=>{unlockAlertSound();setupNotifications();};
+ if(test)test.onclick=async()=>{
+   try{
+     if(window.contentMonitorNative?.testNotification){
+       const ok=await window.contentMonitorNative.testNotification();
+       if(!ok)throw new Error("Native notification permission was not granted");
+       alert("Test notification sent to your phone.");
+       return;
+     }
+     if(!("Notification"in window))throw new Error("Notifications are not supported here.");
+     if(Notification.permission!=="granted"){
+       const p=await Notification.requestPermission();
+       if(p!=="granted")throw new Error("Notification permission was not granted");
+     }
+     new Notification("Content Monitor",{body:"Test notification is working.",silent:false});
+   }catch(e){
+     console.error("Test notification failed",e);
+     alert("Could not send test notification. Please allow notifications in phone settings.");
+   }
+ };const ab=document.querySelector("#alertsBtn");if(ab)ab.onclick=()=>openRoute("/alerts");const ac=document.querySelector("#alertsClose");if(ac)ac.onclick=()=>{document.querySelector("#alertsModal")?.classList.add("hidden");goHome();};
+document.querySelector("#enableNotifications").onclick=()=>setupNotifications();
 document.querySelector("#url").addEventListener("input",()=>{const p=detectPlatform(document.querySelector("#url").value),el=document.querySelector("#platformDetected");el.classList.toggle("hidden",!p);el.textContent=p==="tiktok"?"✓ TikTok detected":"✓ Instagram detected";});
 const minuteOptions=Array.from({length:59},(_,i)=>"<option value='"+i+"'>"+i+"</option>").join("");
 document.querySelector("#alertStartMinute").innerHTML=minuteOptions;
