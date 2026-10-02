@@ -4,38 +4,6 @@ const API=SUPABASE_URL+"/functions/v1/reel-api";
 const VAPID_PUBLIC_KEY="BI4nAWrPOT2kwAyN5LkddZ7plyg79egQg33pZrV6EuFE6SJ8ORy_2Da0Fbk7Lu7VHOp6uDXELzkhGLJcYBk9uOo";
 let reelsData=[];
 let lastAlertId=Number(localStorage.getItem("lastAlertId")||0);
-function playAlertBell(){
- try{
-  unlockAlertSound();
-  if(!alertAudioContext)return;
-  const ctx=alertAudioContext;
-  const now=ctx.currentTime;
-  const gain=ctx.createGain();
-  gain.gain.setValueAtTime(0.0001,now);
-  gain.gain.exponentialRampToValueAtTime(0.32,now+0.02);
-  gain.gain.exponentialRampToValueAtTime(0.0001,now+0.7);
-  gain.connect(ctx.destination);
-  const osc=ctx.createOscillator();
-  osc.type="sine";
-  osc.frequency.setValueAtTime(880,now);
-  osc.frequency.exponentialRampToValueAtTime(660,now+0.7);
-  osc.connect(gain);
-  osc.start(now);
-  osc.stop(now+0.72);
-  const gain2=ctx.createGain();
-  gain2.gain.setValueAtTime(0.0001,now+0.22);
-  gain2.gain.exponentialRampToValueAtTime(0.22,now+0.24);
-  gain2.gain.exponentialRampToValueAtTime(0.0001,now+0.9);
-  gain2.connect(ctx.destination);
-  const osc2=ctx.createOscillator();
-  osc2.type="sine";
-  osc2.frequency.setValueAtTime(1175,now+0.22);
-  osc2.frequency.exponentialRampToValueAtTime(880,now+0.9);
-  osc2.connect(gain2);
-  osc2.start(now+0.22);
-  osc2.stop(now+0.92);
- }catch{}
-}
 const reels=document.querySelector("#reels"),modal=document.querySelector("#modal"),settingsModal=document.querySelector("#settingsModal");
 
 function api(action,body={}){return fetch(API,{method:"POST",headers:{"Content-Type":"text/plain"},body:JSON.stringify({action,...body})});}
