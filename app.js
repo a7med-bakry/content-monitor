@@ -4,7 +4,7 @@ const API=SUPABASE_URL+"/functions/v1/reel-api";
 const VAPID_PUBLIC_KEY="BI4nAWrPOT2kwAyN5LkddZ7plyg79egQg33pZrV6EuFE6SJ8ORy_2Da0Fbk7Lu7VHOp6uDXELzkhGLJcYBk9uOo";
 let reelsData=[];
 let lastAlertId=Number(localStorage.getItem("lastAlertId")||0);
-let alertAudioContext=null;
+let alertAudioContext=null;\nlet alertTone=localStorage.getItem('alertTone')||'bell';
 
 function unlockAlertSound(){
  try{
@@ -73,7 +73,7 @@ async function editMonitoring(id){
  em.innerHTML=Array.from({length:59},(_,i)=>"<option value='"+(i+1)+"'>"+(i+1)+"</option>").join("");
  body.querySelector("#editHour").textContent=new Date().toLocaleTimeString([], {hour:"2-digit",hour12:false}).slice(0,2);
  sm.value=String(r.alert_window_start_minute??1);em.value=String(r.alert_window_end_minute??15);
- body.querySelector("#editRepeat").value=String(Number(r.alert_repeat_minutes||60));body.querySelector("#editMin").value=String(Number(r.alert_min_views_increase||100));
+ body.querySelector("#editRepeat").value=String(Number(r.alert_repeat_minutes||60));body.querySelector("#editMin").value=String(Number(r.alert_min_views_increase||100));if(body.querySelector("#editDrops"))body.querySelector("#editDrops").checked=r.monitor_drops!==false;
  body.querySelector("#editClose").onclick=()=>body.remove();
  body.querySelector("#editSave").onclick=async()=>{
   const btn=body.querySelector("#editSave"),wmStart=Number(sm.value),wmEnd=Number(em.value),repeat=Number(body.querySelector("#editRepeat").value);
@@ -81,7 +81,7 @@ async function editMonitoring(id){
   if(wmEnd<=wmStart){alert("The end minute must be after the start minute.");return;}
   btn.disabled=true;btn.textContent="Saving...";
   try{
-   const q=await api("update",{content_id:id,alert_window_start_minute:wmStart,alert_window_end_minute:wmEnd,alert_repeat_minutes:repeat,alert_anchor_at:computeAlertAnchor(wmStart,wmEnd,repeat),alert_min_views_increase:Number(body.querySelector("#editMin").value)});
+   const q=await api("update",{content_id:id,alert_window_start_minute:wmStart,alert_window_end_minute:wmEnd,alert_repeat_minutes:repeat,alert_anchor_at:computeAlertAnchor(wmStart,wmEnd,repeat),alert_min_views_increase:Number(body.querySelector("#editMin").value),monitor_drops:body.querySelector("#editDrops")?.checked});
    const d=await q.json().catch(()=>({}));if(!q.ok)throw new Error(d.error||"Server rejected the update");
    const i=reelsData.findIndex(x=>String(x.id)===String(id));if(i>=0)reelsData[i]={...reelsData[i],...(d.reel||{})};
    body.remove();render();showDetails(id);
@@ -97,7 +97,7 @@ async function addReel(){
  if(!url){alert("Paste the Reel/Video URL first");return;}if(!platform){alert("Use an Instagram or TikTok link.");return;}if(alertWindowEnd<=alertWindowStart){alert("The end minute must be after the start minute.");return;}if(minViews<1){alert("Minimum views must be at least 1.");return;}
  
  const btn=document.querySelector("#saveBtn");btn.disabled=true;btn.textContent="Adding Reel + first snapshot...";
- try{const r=await api("add",{platform,url,title,platform_media_id:mediaId(url,platform),alert_window_start_minute:alertWindowStart,alert_window_end_minute:alertWindowEnd,alert_repeat_minutes:alertRepeat,alert_anchor_at:computeAlertAnchor(alertWindowStart,alertWindowEnd,alertRepeat),alert_min_views_increase:minViews});const d=await r.json();if(!r.ok)throw new Error(d.error||"Failed to add Reel");closeModal();await loadReels();const first=d.first_snapshot;if(first?.data?.ok||first?.ok){const m=first.data?.metrics||first.metrics||{};alert("Reel added successfully. First snapshot captured: " + "Views: " + Number(m.views||0).toLocaleString() + " | Likes: " + Number(m.likes||0).toLocaleString());}else alert("Reel added, but the first snapshot could not be read yet. Supabase will retry on the next 5-minute check.");}
+ try{const r=await api("add",{platform,url,title,platform_media_id:mediaId(url,platform),alert_window_start_minute:alertWindowStart,alert_window_end_minute:alertWindowEnd,alert_repeat_minutes:alertRepeat,alert_anchor_at:computeAlertAnchor(alertWindowStart,alertWindowEnd,alertRepeat),alert_min_views_increase:minViews,monitor_drops:document.querySelector("#monitorDrops")?.checked});const d=await r.json();if(!r.ok)throw new Error(d.error||"Failed to add Reel");closeModal();await loadReels();const first=d.first_snapshot;if(first?.data?.ok||first?.ok){const m=first.data?.metrics||first.metrics||{};alert("Reel added successfully. First snapshot captured: " + "Views: " + Number(m.views||0).toLocaleString() + " | Likes: " + Number(m.likes||0).toLocaleString());}else alert("Reel added, but the first snapshot could not be read yet. Supabase will retry on the next 5-minute check.");}
  catch(e){alert("Could not add Reel: "+(e.message||e));}finally{btn.disabled=false;btn.textContent="Add Reel & Take First Snapshot";}
 }
 function closeModal(){modal.classList.add("hidden");}
@@ -105,7 +105,30 @@ function openModal(){document.querySelector("#currentHour").textContent=new Date
 async function showHistory(id,title){const overlay=document.createElement("div");overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:10000;overflow:auto;padding:20px";overlay.innerHTML="<div style='max-width:820px;margin:30px auto;background:#111;color:#fff;border-radius:18px;padding:18px'><div style='display:flex;justify-content:space-between;align-items:center;gap:10px'><div><h2 style='margin:0'>Snapshot History</h2><div style='opacity:.65;font-size:13px'>"+esc(title)+"</div></div><button id='closeHistory' class='secondary'>Close</button></div><div id='historyBody' style='margin-top:16px'>Loading...</div></div>";document.body.appendChild(overlay);overlay.querySelector("#closeHistory").onclick=()=>overlay.remove();try{const r=await api("history",{content_id:id}),d=await r.json();if(!r.ok)throw new Error(d.error||"Failed to load history");const rows=Array.isArray(d)?d:[];overlay.querySelector("#historyBody").innerHTML=rows.length?rows.map((s,i)=>{const p=rows[i+1],dv=p?Number(s.views||0)-Number(p.views||0):null,dl=p?Number(s.likes||0)-Number(p.likes||0):null,delta=p?"Δ Views: "+(dv>=0?"+":"")+dv.toLocaleString()+" · Likes: "+(dl>=0?"+":"")+dl.toLocaleString():"First snapshot";return "<div style='padding:12px 0;border-bottom:1px solid #2b2b2b'><div style='font-size:12px;opacity:.6'>"+esc(fmt(s.captured_at))+"</div><div style='line-height:1.9'>Views <b>"+Number(s.views||0).toLocaleString()+"</b> · Likes <b>"+Number(s.likes||0).toLocaleString()+"</b> · Comments <b>"+Number(s.comments||0).toLocaleString()+"</b> · Shares <b>"+Number(s.shares||0).toLocaleString()+"</b></div><div style='font-size:12px;opacity:.7'>"+delta+"</div></div>";}).join(""):"<div class='empty'>No snapshots yet.</div>";}catch(e){overlay.querySelector("#historyBody").innerHTML="<div class='empty'>Failed to load history.<br><br>"+esc(e.message||e)+"</div>";}}
 window.showHistory=showHistory;
 
-async function checkAlerts(){try{const r=await api("alerts",{after_id:lastAlertId}),d=await r.json();if(!r.ok)return;const rows=Array.isArray(d)?d:[];for(const a of rows){if(Number(a.id)<=lastAlertId)continue;playAlertBell();lastAlertId=Number(a.id);localStorage.setItem("lastAlertId",String(lastAlertId));const reel=reelsData.find(x=>String(x.id)===String(a.content_id));const title=reel?.title||"Reel";const required=Number(reel?.alert_min_views_increase||100);const body="Views increased by "+Number(Number(a.current_views||0)-Number(a.previous_views||0)).toLocaleString()+" (required "+required.toLocaleString()+")";if("Notification"in window&&Notification.permission==="granted")new Notification("⚠️ "+title,{body});else alert("⚠️ " + title + " | " + body);}if(rows.length)loadReels();}catch{}}
+function playTone(kind=alertTone){
+ try{
+  unlockAlertSound(); if(!alertAudioContext)return;
+  const ctx=alertAudioContext,now=ctx.currentTime;
+  const sets={bell:[880,660],double:[880,660,880],beep:[950],alarm:[900,650,900,650]};
+  (sets[kind]||sets.bell).forEach((f,i)=>{const t=now+i*.18,g=ctx.createGain(),o=ctx.createOscillator();g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.3,t+.02);g.gain.exponentialRampToValueAtTime(.0001,t+.5);o.frequency.value=f;o.connect(g);g.connect(ctx.destination);o.start(t);o.stop(t+.52);});
+ }catch{}
+}
+async function loadAlertHistory(){
+ const box=document.querySelector("#alertList"); if(!box)return;
+ try{
+  const q=await api("alerts_history"),rows=await q.json(); if(!q.ok)throw new Error();
+  if(!rows.length){box.innerHTML="<div class='empty'>No alerts yet.</div>";return;}
+  box.innerHTML=rows.map(a=>{
+   const metric=a.metric==="likes"?"Likes":a.metric==="comments"?"Comments":a.metric==="shares"?"Shares":"Views";
+   const drop=a.alert_type==="metric_drop";
+   const old=Number(drop?(a["previous_"+(a.metric||"views")]||0):a.previous_views||0);
+   const cur=Number(drop?(a["current_"+(a.metric||"views")]||0):a.current_views||0);
+   const msg=drop?metric+" dropped from "+old.toLocaleString()+" to "+cur.toLocaleString():"Views did not reach the required growth.";
+   return "<button class='alert-item' onclick='window.open("+JSON.stringify(a.url||"#")+",\'_blank\')'><b>"+esc(a.title||"Clip")+"</b><span>"+esc(fmt(a.created_at))+"</span><small>"+esc(msg)+"</small></button>";
+  }).join("");
+ }catch{box.innerHTML="<div class='empty'>Could not load alerts.</div>";}
+}
+async function checkAlerts(){try{const r=await api("alerts",{after_id:lastAlertId}),d=await r.json();if(!r.ok)return;const rows=Array.isArray(d)?d:[];for(const a of rows){if(Number(a.id)<=lastAlertId)continue;playTone();lastAlertId=Number(a.id);localStorage.setItem("lastAlertId",String(lastAlertId));const reel=reelsData.find(x=>String(x.id)===String(a.content_id));const title=reel?.title||"Reel";const required=Number(reel?.alert_min_views_increase||100);const drop=a.alert_type==="metric_drop",metric=a.metric||"views",label=metric==="likes"?"Likes":metric==="comments"?"Comments":metric==="shares"?"Shares":"Views";const body=drop?(label+" dropped from "+Number(a["previous_"+metric]||0).toLocaleString()+" to "+Number(a["current_"+metric]||0).toLocaleString()):("Views increased by "+Number(Number(a.current_views||0)-Number(a.previous_views||0)).toLocaleString()+" (required "+required.toLocaleString()+")");if("Notification"in window&&Notification.permission==="granted")new Notification("⚠️ "+title,{body});else alert("⚠️ " + title + " | " + body);}if(rows.length)loadReels();}catch{}}
 
 async function setupNotifications(){if(!("Notification"in window)){alert("Notifications are not supported here.");return;}const p=Notification.permission==="granted"?"granted":await Notification.requestPermission();if(p==="granted")alert("Notifications enabled. Keep this app open to receive live alerts.");}
 
@@ -117,7 +140,7 @@ document.querySelector("#saveBtn").onclick=addReel;
 document.querySelector("#refreshBtn").onclick=loadReels;
 document.querySelector("#homeBtn").onclick=loadReels;
 document.querySelector("#settingsBtn").onclick=()=>settingsModal.classList.remove("hidden");
-document.querySelector("#settingsClose").onclick=()=>settingsModal.classList.add("hidden");
+document.querySelector("#settingsClose").onclick=()=>settingsModal.classList.add("hidden");\nconst tone=document.querySelector("#alarmTone");if(tone){tone.value=alertTone;tone.onchange=()=>{alertTone=tone.value;localStorage.setItem("alertTone",alertTone);};}const test=document.querySelector("#testAlarm");if(test)test.onclick=()=>playTone();const ab=document.querySelector("#alertsBtn");if(ab)ab.onclick=()=>{document.querySelector("#alertsModal")?.classList.remove("hidden");loadAlertHistory();};const ac=document.querySelector("#alertsClose");if(ac)ac.onclick=()=>document.querySelector("#alertsModal")?.classList.add("hidden");
 document.querySelector("#enableNotifications").onclick=()=>{unlockAlertSound();setupNotifications();};
 document.querySelector("#url").addEventListener("input",()=>{const p=detectPlatform(document.querySelector("#url").value),el=document.querySelector("#platformDetected");el.classList.toggle("hidden",!p);el.textContent=p==="tiktok"?"✓ TikTok detected":"✓ Instagram detected";});
 const minuteOptions=Array.from({length:59},(_,i)=>"<option value='"+i+"'>"+i+"</option>").join("");
