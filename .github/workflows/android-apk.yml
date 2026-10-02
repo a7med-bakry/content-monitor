@@ -154,7 +154,7 @@ jobs:
                       String channelId = "content_monitor_alerts";
                       if (manager.getNotificationChannel(channelId) == null) {
                           NotificationChannel channel = new NotificationChannel(channelId, "Content Monitor alerts", NotificationManager.IMPORTANCE_HIGH);
-                          Uri sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
+                          Uri sound = Uri.parse("android.resource://" + context.getPackageName() + "/" + com.contentmonitor.app.R.raw.alert_siren);
                           AudioAttributes attrs = new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION).build();
                           channel.setSound(sound, attrs);
                           channel.enableVibration(true);
@@ -230,6 +230,23 @@ jobs:
           }
           
           JAVA
+
+      - name: Generate 15-second alert siren
+        run: |
+          mkdir -p android/app/src/main/res/raw
+          python3 - <<'PY'
+          import math, wave, struct
+          rate=44100
+          with wave.open("android/app/src/main/res/raw/alert_siren.wav","w") as f:
+              f.setnchannels(1); f.setsampwidth(2); f.setframerate(rate)
+              for i in range(rate*15):
+                  t=i/rate
+                  p=t%1.8
+                  f0=780+(520-780)*(p/0.9) if p<0.9 else 520+(780-520)*((p-0.9)/0.9)
+                  a=0.30*(1 if p<1.65 else max(0,(1.8-p)/0.15))
+                  x=a*math.sin(2*math.pi*f0*t)+0.07*math.sin(4*math.pi*f0*t)
+                  f.writeframes(struct.pack("<h",int(max(-1,min(1,x))*32767)))
+          PY
 
       - name: Set FCM default notification channel
         run: |
