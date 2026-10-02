@@ -324,8 +324,8 @@ if(chooseSound)chooseSound.onclick=async()=>{
 if(window.contentMonitorNative?.getAlertSound)window.contentMonitorNative.getAlertSound().then(r=>{if(r&&soundName)soundName.textContent=r.name||"Default Android sound";});
 const test=document.querySelector("#testAlarm");
 if(test)test.onclick=async()=>{
-  if(window.contentMonitorNative?.notify){
-    await window.contentMonitorNative.notify("Content Monitor","Test alert sound");
+  if(window.contentMonitorNative?.playAlertSound){
+    await window.contentMonitorNative.playAlertSound();
   }else playTone();
 };const ab=document.querySelector("#alertsBtn");if(ab)ab.onclick=()=>openRoute("/alerts");const ac=document.querySelector("#alertsClose");if(ac)ac.onclick=()=>{document.querySelector("#alertsModal")?.classList.add("hidden");goHome();};
 document.querySelector("#enableNotifications").onclick=()=>{unlockAlertSound();setupNotifications();};
