@@ -117,22 +117,34 @@ async function showMonitoring(id){
   const startMin=Number(r.alert_window_start_minute??1),endMin=Number(r.alert_window_end_minute??15),repeat=Math.max(1,Number(r.alert_repeat_minutes||60)),minViews=Math.max(1,Number(r.alert_min_views_increase||100));
   const snaps=history.slice().sort((a,b)=>new Date(a.captured_at)-new Date(b.captured_at));
   if(!snaps.length){body.innerHTML="<div class='empty'>No snapshots yet.</div>";return;}
-  const latest=new Date(snaps[snaps.length-1].captured_at),windows=[];
+  const latestMs=new Date(snaps[snaps.length-1].captured_at).getTime();
   const duration=(endMin-startMin)*60000;
   let first=r.alert_anchor_at?new Date(r.alert_anchor_at):null;
-  if(!first||!Number.isFinite(first.getTime())){first=new Date(r.monitor_start_at||snaps[0].captured_at);first.setSeconds(0,0);first.setMinutes(startMin);if(first.getTime()<new Date(r.monitor_start_at||snaps[0].captured_at).getTime())first=new Date(first.getTime()+3600000);}
-  let ws=new Date(first),guard=0;
-  while(ws.getTime()<=latest.getTime()+repeat*60000&&guard++<500){
-   const we=new Date(ws.getTime()+duration);
-   const inside=snaps.filter(s=>{const t=new Date(s.captured_at).getTime();return t>=ws.getTime()&&t<=we.getTime();});
-   if(inside.length)windows.push({ws:new Date(ws),we,inside});
-   ws=new Date(ws.getTime()+repeat*60000);
+  if(!first||!Number.isFinite(first.getTime())){
+    first=new Date(r.monitor_start_at||snaps[0].captured_at);
+    first.setSeconds(0,0);first.setMinutes(startMin);
+    if(first.getTime()<new Date(r.monitor_start_at||snaps[0].captured_at).getTime())first=new Date(first.getTime()+3600000);
   }
-  if(!windows.length){body.innerHTML="<div class='empty'>No monitoring windows have started yet.</div>";return;}
-  body.innerHTML="<div class='monitor-summary'><span>Window "+startMin+"–"+endMin+" · every "+repeat+" min</span><b>Minimum increase: "+minViews.toLocaleString()+" views</b></div>"+windows.map((w,i)=>{
-   const firstS=w.inside[0],lastS=w.inside[w.inside.length-1],hasData=w.inside.length>0,delta=w.inside.length>1?Number(lastS.views||0)-Number(firstS.views||0):0,complete=Date.now()>w.we.getTime(),pass=hasData&&delta>=minViews,status=!hasData?"nodata":complete?(pass?"pass":"fail"):"pending";
-   const snapsHtml=w.inside.map((s,j)=>{const prev=j?w.inside[j-1]:null,d=prev?Number(s.views||0)-Number(prev.views||0):0;return "<div class='monitor-snap'><span>"+esc(fmt(s.captured_at))+"</span><b>"+Number(s.views||0).toLocaleString()+"</b><em class='"+(d>=0?"up":"down")+"'>"+(prev?(d>=0?"+":"")+d.toLocaleString()+" views":"start")+"</em></div>"}).join("");
-   return "<div class='monitor-row'><div class='monitor-row-top'><div class='monitor-number'>"+(i+1)+"</div><div class='monitor-period'><b>"+esc(fmt(w.ws))+" → "+esc(fmt(w.we))+"</b><small>"+w.inside.length+" snapshots</small></div><div class='monitor-status "+status+"'>"+(!hasData?"NO DATA":complete?(pass?"PASS":"NOT MET"):"IN PROGRESS")+"</div></div><div class='monitor-result'><span>Views increase</span><strong>"+(hasData?(delta>=0?"+":"")+delta.toLocaleString():"—")+"</strong><small>"+(hasData?"required ≥ "+minViews.toLocaleString():"Waiting for snapshots in this window")+"</small></div><div class='monitor-snaps'>"+(snapsHtml||"<div class='empty' style='padding:16px'>No snapshots in this window yet.</div>")+"</div></div>";
+  const windows=[];let ws=new Date(first),guard=0;
+  while(ws.getTime()<=latestMs&&guard++<500){
+    const we=new Date(ws.getTime()+duration);
+    const inside=snaps.filter(s=>{const t=new Date(s.captured_at).getTime();return t>=ws.getTime()&&t<=we.getTime();});
+    const baseline=[...snaps].reverse().find(s=>new Date(s.captured_at).getTime()<=ws.getTime());
+    const finish=[...snaps].reverse().find(s=>new Date(s.captured_at).getTime()<=we.getTime()&&new Date(s.captured_at).getTime()>=ws.getTime());
+    const complete=latestMs>=we.getTime();
+    const hasResult=complete&&baseline&&finish&&baseline.views!=null&&finish.views!=null;
+    const delta=hasResult?Number(finish.views)-Number(baseline.views):null;
+    const status=!complete?"pending":hasResult?(delta>=minViews?"pass":"fail"):"nodata";
+    windows.push({ws,we,inside,baseline,finish,complete,hasResult,delta,status});
+    ws=new Date(ws.getTime()+repeat*60000);
+  }
+  if(!windows.length){body.innerHTML="<div class='empty'>No monitoring window has started yet.</div>";return;}
+  body.innerHTML="<div class='monitor-summary'><span>Window "+startMin+"–"+endMin+" · every "+repeat+" min</span><b>Minimum increase: "+minViews.toLocaleString()+" views</b></div>"+windows.reverse().map((w,i)=>{
+   const snapsHtml=w.inside.map((s,j)=>{const prev=w.inside[j-1],d=prev?Number(s.views||0)-Number(prev.views||0):0;return "<div class='monitor-snap'><span>"+esc(fmt(s.captured_at))+"</span><b>"+Number(s.views||0).toLocaleString()+"</b><em class='"+(d>=0?"up":"down")+"'>"+(prev?(d>=0?"+":"")+d.toLocaleString()+" views":"start")+"</em></div>"}).join("");
+   const label=w.status==="pass"?"PASS":w.status==="fail"?"NOT MET":w.status==="pending"?"IN PROGRESS":"NO DATA";
+   const result=w.hasResult?(w.delta>=0?"+":"")+w.delta.toLocaleString():"—";
+   const help=w.hasResult?"required ≥ "+minViews.toLocaleString():(w.complete?"No usable snapshot inside this window yet":"Waiting for the window to finish");
+   return "<div class='monitor-row'><div class='monitor-row-top'><div class='monitor-number'>"+(windows.length-i)+"</div><div class='monitor-period'><b>"+esc(fmt(w.ws))+" → "+esc(fmt(w.we))+"</b><small>"+w.inside.length+" snapshots</small></div><div class='monitor-status "+w.status+"'>"+label+"</div></div><div class='monitor-result'><span>Views increase</span><strong>"+result+"</strong><small>"+help+"</small></div><div class='monitor-snaps'>"+(snapsHtml||"<div class='empty' style='padding:16px'>No snapshots in this window yet.</div>")+"</div></div>";
   }).join("");
  };
  const renderDrops=()=>{
