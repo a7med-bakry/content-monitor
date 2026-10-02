@@ -34,8 +34,7 @@ async function editMonitoring(id){
  body.querySelector("#editRepeat").value=String(Number(r.alert_repeat_minutes||60));body.querySelector("#editMin").value=String(Number(r.alert_min_views_increase||100));
  body.querySelector("#editClose").onclick=()=>body.remove();
  body.querySelector("#editSave").onclick=async()=>{
-  const btn=body.querySelector("#editSave"),start=body.querySelector("#editStart").value,end=body.querySelector("#editEnd").value,wmStart=Number(sm.value),wmEnd=Number(em.value);
-  if(!start||!end||new Date(end)<=new Date(start)){alert("Choose a valid start and end time.");return;}
+  const btn=body.querySelector("#editSave"),wmStart=Number(sm.value),wmEnd=Number(em.value),repeat=Number(body.querySelector("#editRepeat").value);\n  if(repeat<1){alert("Repeat must be at least 1 minute.");return;}
   if(wmEnd<=wmStart){alert("The end minute must be after the start minute.");return;}
   btn.disabled=true;btn.textContent="Saving...";
   try{
@@ -50,8 +49,8 @@ window.editMonitoring=editMonitoring;window.editMonitoring=editMonitoring;
 
 async function addReel(){
  const url=document.querySelector("#url").value.trim(),platform=detectPlatform(url),title=document.querySelector("#title").value.trim()||"New Reel";
- const startValue=document.querySelector("#start").value,endValue=document.querySelector("#end").value;
- const alertWindowStart=Number(document.querySelector("#alertStartMinute").value||1),alertWindowEnd=Number(document.querySelector("#alertEndMinute").value||15),alertWindowHours=Number(document.querySelector("#alertWindowHours").value||1),minViews=Number(document.querySelector("#minViews").value||100);
+
+ const alertWindowStart=Number(document.querySelector("#alertStartMinute").value||1),alertWindowEnd=Number(document.querySelector("#alertEndMinute").value||15),alertRepeat=Number(document.querySelector("#alertRepeatMinutes").value||60),minViews=Number(document.querySelector("#minViews").value||100);
  if(!url){alert("Paste the Reel/Video URL first");return;}if(!platform){alert("Use an Instagram or TikTok link.");return;}if(alertWindowEnd<=alertWindowStart){alert("The end minute must be after the start minute.");return;}if(minViews<1){alert("Minimum views must be at least 1.");return;}
  
  const btn=document.querySelector("#saveBtn");btn.disabled=true;btn.textContent="Adding Reel + first snapshot...";
