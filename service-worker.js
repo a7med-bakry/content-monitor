@@ -1,5 +1,5 @@
-const CACHE_NAME = "content-monitor-v8";
-const ASSETS = ["./","./index.html","./styles.css?v=2","./app.js?v=19","./manifest.json"];
+const CACHE_NAME = "content-monitor-v9";
+const ASSETS = ["./","./index.html","./styles.css?v=2","./app.js?v=20","./manifest.json"];
 
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
