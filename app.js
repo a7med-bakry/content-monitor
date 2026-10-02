@@ -41,6 +41,8 @@ async function editMonitoring(id){
   }catch(err){btn.disabled=false;btn.textContent="Save changes";alert("Could not save changes: "+(err.message||err));}
  };
 }
+window.editMonitoring=editMonitoring;
+
 async function addReel(){
   const url=document.querySelector("#url").value.trim(),platform=detectPlatform(url),title=document.querySelector("#title").value.trim()||"New Reel";
   const startValue=document.querySelector("#start").value,endValue=document.querySelector("#end").value;
