@@ -67,7 +67,7 @@ window.showDetails=showDetails;
 async function editMonitoring(id){
  const r=reelsData.find(x=>String(x.id)===String(id));if(!r)return;
  const body=document.createElement("div");body.className="edit-box";
- body.innerHTML="<button class='close' id='editClose'>×</button><h3>Edit monitoring</h3><div class='current-hour'>Current hour: <b id='editHour'>—</b></div><div class='grid'><label>From minute<select id='editStartMinute'></select></label><label>To minute<select id='editEndMinute'></select></label></div><label>Repeat every (minutes)<input id='editRepeat' type='number' min='1' step='1'></label><label>Minimum views<input id='editMin' type='number' min='1'></label><button class='primary' id='editSave'>Save changes</button>";
+ body.innerHTML="<button class='close' id='editClose'>×</button><h3>Edit monitoring</h3><div class='current-hour'>Current hour: <b id='editHour'>—</b></div><div class='grid'><label>From minute<select id='editStartMinute'></select></label><label>To minute<select id='editEndMinute'></select></label></div><label>Repeat every (minutes)<input id='editRepeat' type='number' min='1' step='1'></label><label>Minimum views<input id='editMin' type='number' min='1'></label><label class='toggle-row'><span><b>Monitor drops</b><small>Alert on any decrease in views, likes, comments, or shares.</small></span><input id='editDrops' type='checkbox'></label><button class='primary' id='editSave'>Save changes</button>";
  document.body.appendChild(body);
  const sm=body.querySelector("#editStartMinute"),em=body.querySelector("#editEndMinute");
  sm.innerHTML=Array.from({length:59},(_,i)=>"<option value='"+i+"'>"+i+"</option>").join("");
@@ -135,6 +135,8 @@ async function setupNotifications(){if(!("Notification"in window)){alert("Notifi
 
 document.addEventListener("pointerdown",unlockAlertSound,{once:true});
 document.querySelector("#addBtn").onclick=()=>{unlockAlertSound();openModal();};
+const alertsBtn=document.querySelector("#alertsBtn");if(alertsBtn)alertsBtn.onclick=()=>{document.querySelector("#alertsModal")?.classList.remove("hidden");loadAlertHistory();};
+const alertsClose=document.querySelector("#alertsClose");if(alertsClose)alertsClose.onclick=()=>document.querySelector("#alertsModal")?.classList.add("hidden");
 document.querySelector("#newReel").onclick=openModal;
 document.querySelector("#closeBtn").onclick=closeModal;
 document.querySelector("#saveBtn").onclick=addReel;
