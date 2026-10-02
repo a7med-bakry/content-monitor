@@ -358,9 +358,23 @@ if(chooseSound)chooseSound.onclick=async()=>{
 if(window.contentMonitorNative?.getAlertSound)window.contentMonitorNative.getAlertSound().then(r=>{if(r&&soundName)soundName.textContent=r.name||"Default Android sound";});
 const test=document.querySelector("#testAlarm");
 if(test)test.onclick=async()=>{
-  if(window.contentMonitorNative?.playAlertSound){
-    await window.contentMonitorNative.playAlertSound();
-  }else playTone();
+  try{
+    if("Notification" in window){
+      if(Notification.permission!=="granted"){
+        const p=await Notification.requestPermission();
+        if(p!=="granted")return alert("Please allow notifications from your phone/browser.");
+      }
+      new Notification("Content Monitor",{
+        body:"Test notification — your phone's default notification sound will be used.",
+        tag:"content-monitor-test",
+        renotify:true
+      });
+    }else{
+      alert("Notifications are not supported in this browser.");
+    }
+  }catch(e){
+    alert("Could not send test notification.");
+  }
 };const ab=document.querySelector("#alertsBtn");if(ab)ab.onclick=()=>openRoute("/alerts");const ac=document.querySelector("#alertsClose");if(ac)ac.onclick=()=>{document.querySelector("#alertsModal")?.classList.add("hidden");goHome();};
 document.querySelector("#enableNotifications").onclick=()=>{unlockAlertSound();setupNotifications();};
 document.querySelector("#url").addEventListener("input",()=>{const p=detectPlatform(document.querySelector("#url").value),el=document.querySelector("#platformDetected");el.classList.toggle("hidden",!p);el.textContent=p==="tiktok"?"✓ TikTok detected":"✓ Instagram detected";});
