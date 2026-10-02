@@ -167,7 +167,7 @@ jobs:
                               testPlayer.release();
                               testPlayer = null;
                           }
-                      }, 15000);
+                      }, 10000);
                       call.resolve();
                   } catch (Exception e) {
                       call.reject("Alert sound failed: " + e.getMessage());
@@ -274,7 +274,7 @@ jobs:
 
           out = Path("android/app/src/main/res/raw/alert_siren.wav")
           sample_rate = 44100
-          duration = 15.0
+          duration = 10.0
           channels = 1
           amplitude = 0.45
 
