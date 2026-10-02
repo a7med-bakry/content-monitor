@@ -4,7 +4,8 @@ const API=SUPABASE_URL+"/functions/v1/reel-api";
 const VAPID_PUBLIC_KEY="BI4nAWrPOT2kwAyN5LkddZ7plyg79egQg33pZrV6EuFE6SJ8ORy_2Da0Fbk7Lu7VHOp6uDXELzkhGLJcYBk9uOo";
 let reelsData=[];
 let lastAlertId=Number(localStorage.getItem("lastAlertId")||0);
-let alertAudioContext=null;\nlet alertTone=localStorage.getItem('alertTone')||'bell';
+let alertAudioContext=null;
+let alertTone=localStorage.getItem('alertTone')||'bell';
 
 function unlockAlertSound(){
  try{
@@ -140,7 +141,8 @@ document.querySelector("#saveBtn").onclick=addReel;
 document.querySelector("#refreshBtn").onclick=loadReels;
 document.querySelector("#homeBtn").onclick=loadReels;
 document.querySelector("#settingsBtn").onclick=()=>settingsModal.classList.remove("hidden");
-document.querySelector("#settingsClose").onclick=()=>settingsModal.classList.add("hidden");\nconst tone=document.querySelector("#alarmTone");if(tone){tone.value=alertTone;tone.onchange=()=>{alertTone=tone.value;localStorage.setItem("alertTone",alertTone);};}const test=document.querySelector("#testAlarm");if(test)test.onclick=()=>playTone();const ab=document.querySelector("#alertsBtn");if(ab)ab.onclick=()=>{document.querySelector("#alertsModal")?.classList.remove("hidden");loadAlertHistory();};const ac=document.querySelector("#alertsClose");if(ac)ac.onclick=()=>document.querySelector("#alertsModal")?.classList.add("hidden");
+document.querySelector("#settingsClose").onclick=()=>settingsModal.classList.add("hidden");
+const tone=document.querySelector("#alarmTone");if(tone){tone.value=alertTone;tone.onchange=()=>{alertTone=tone.value;localStorage.setItem("alertTone",alertTone);};}const test=document.querySelector("#testAlarm");if(test)test.onclick=()=>playTone();const ab=document.querySelector("#alertsBtn");if(ab)ab.onclick=()=>{document.querySelector("#alertsModal")?.classList.remove("hidden");loadAlertHistory();};const ac=document.querySelector("#alertsClose");if(ac)ac.onclick=()=>document.querySelector("#alertsModal")?.classList.add("hidden");
 document.querySelector("#enableNotifications").onclick=()=>{unlockAlertSound();setupNotifications();};
 document.querySelector("#url").addEventListener("input",()=>{const p=detectPlatform(document.querySelector("#url").value),el=document.querySelector("#platformDetected");el.classList.toggle("hidden",!p);el.textContent=p==="tiktok"?"✓ TikTok detected":"✓ Instagram detected";});
 const minuteOptions=Array.from({length:59},(_,i)=>"<option value='"+i+"'>"+i+"</option>").join("");
