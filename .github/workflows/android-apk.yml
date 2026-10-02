@@ -87,62 +87,13 @@ jobs:
           
           import androidx.core.app.NotificationCompat;
           
-          import com.getcapacitor.JSObject;
           import com.getcapacitor.Plugin;
           import com.getcapacitor.PluginCall;
           import com.getcapacitor.PluginMethod;
           import com.getcapacitor.annotation.CapacitorPlugin;
-          import com.getcapacitor.annotation.ActivityCallback;
           
           @CapacitorPlugin(name = "ContentMonitorNotifications")
           public class ContentMonitorNotificationsPlugin extends Plugin {
-              private static final String PREFS = "content_monitor_notifications";
-              private static final String SOUND_URI = "sound_uri";
-          
-              @PluginMethod
-              public void pickNotificationSound(PluginCall call) {
-                  Uri existing = getSavedSound();
-                  Intent intent = new Intent(RingtoneManager.ACTION_RINGTONE_PICKER);
-                  intent.putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_RINGTONE);
-                  intent.putExtra(RingtoneManager.EXTRA_RINGTONE_TITLE, "Choose alert sound");
-                  intent.putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true);
-                  intent.putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, existing);
-                  startActivityForResult(call, intent, "handleSoundPicker");
-              }
-          
-              @ActivityCallback
-              private void handleSoundPicker(PluginCall call, androidx.activity.result.ActivityResult result) {
-                  Intent data = result.getData();
-                  if (data == null) {
-                      call.reject("Sound selection cancelled");
-                      return;
-                  }
-                  Uri uri = data.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI);
-                  if (uri == null) {
-                      getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(SOUND_URI).apply();
-                      JSObject ret = new JSObject();
-                      ret.put("uri", "");
-                      ret.put("name", "Default");
-                      call.resolve(ret);
-                      return;
-                  }
-                  saveSound(uri);
-                  JSObject ret = new JSObject();
-                  ret.put("uri", uri.toString());
-                  ret.put("name", RingtoneManager.getRingtone(getContext(), uri).getTitle(getContext()));
-                  call.resolve(ret);
-              }
-          
-              @PluginMethod
-              public void getNotificationSound(PluginCall call) {
-                  Uri uri = getSavedSound();
-                  JSObject ret = new JSObject();
-                  ret.put("uri", uri == null ? "" : uri.toString());
-                  ret.put("name", uri == null ? "Default" : RingtoneManager.getRingtone(getContext(), uri).getTitle(getContext()));
-                  call.resolve(ret);
-              }
-          
-
               @PluginMethod
               public void notifyAlert(PluginCall call) {
                   showNotification(call.getString("title", "Content Monitor"), call.getString("body", ""));
@@ -152,42 +103,24 @@ jobs:
               public static void ensureAlertChannel(Context context) {
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                       NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-                      String channelId = "content_monitor_alerts_silent";
+                      String channelId = "content_monitor_alerts";
                       if (manager.getNotificationChannel(channelId) == null) {
                           NotificationChannel channel = new NotificationChannel(channelId, "Content Monitor alerts", NotificationManager.IMPORTANCE_HIGH);
+                          Uri sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
                           AudioAttributes attrs = new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION).build();
-                          channel.setSound(null, null);
+                          channel.setSound(sound, attrs);
                           channel.enableVibration(true);
                           manager.createNotificationChannel(channel);
                       }
                   }
-              }
-          
-              private Uri getSavedSound() {
-                  String value = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(SOUND_URI, "");
-                  return value == null || value.isEmpty() ? null : Uri.parse(value);
-              }
-          
-              private void saveSound(Uri uri) {
-                  getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(SOUND_URI, uri.toString()).apply();
               }
           
               private void showNotification(String title, String body) {
                   Context context = getContext();
                   NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-                  Uri sound = getSavedSound();
-                  String channelId = "content_monitor_alerts_silent";
+                  String channelId = "content_monitor_alerts";
           
-                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                      NotificationChannel channel = manager.getNotificationChannel(channelId);
-                      if (channel == null) {
-                          channel = new NotificationChannel(channelId, "Content Monitor alerts", NotificationManager.IMPORTANCE_HIGH);
-                          AudioAttributes attrs = new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION).build();
-                          channel.setSound(null, null);
-                          channel.enableVibration(true);
-                          manager.createNotificationChannel(channel);
-                      }
-                  }
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ensureAlertChannel(context);
           
                   Intent launch = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
                   PendingIntent pending = null;
@@ -205,8 +138,7 @@ jobs:
                           .setCategory(NotificationCompat.CATEGORY_ALARM);
           
                   if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-                      if (sound != null) builder.setSound(sound);
-                      else builder.setDefaults(NotificationCompat.DEFAULT_SOUND);
+                      builder.setDefaults(NotificationCompat.DEFAULT_SOUND | NotificationCompat.DEFAULT_VIBRATE);
                   }
                   if (pending != null) builder.setContentIntent(pending);
                   manager.notify((int)(System.currentTimeMillis() % 2000000000L), builder.build());
@@ -214,6 +146,7 @@ jobs:
           }
           
           JAVA
+          
           cat > android/app/src/main/java/com/contentmonitor/app/MainActivity.java <<'JAVA'
           package com.contentmonitor.app;
           
@@ -237,7 +170,7 @@ jobs:
           from pathlib import Path
           p=Path("android/app/src/main/AndroidManifest.xml")
           s=p.read_text()
-          meta='<meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="content_monitor_alerts_silent" />'
+          meta='<meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="content_monitor_alerts" />'
           if 'com.google.firebase.messaging.default_notification_channel_id' not in s:
               pos=s.rfind('</application>')
               if pos<0: raise SystemExit('application tag not found')
