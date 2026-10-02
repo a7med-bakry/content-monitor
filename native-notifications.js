@@ -1,19 +1,40 @@
-import { Capacitor, registerPlugin } from "@capacitor/core";
+import { Capacitor } from "@capacitor/core";
 import { PushNotifications } from "@capacitor/push-notifications";
+import { LocalNotifications } from "@capacitor/local-notifications";
 
 const native = Capacitor.isNativePlatform();
-const ContentMonitorNotifications = registerPlugin("ContentMonitorNotifications");
 window.contentMonitorNative = window.contentMonitorNative || {};
+const CHANNEL_ID = "content_monitor_alerts";
+let pushListenersReady = false;
+let localChannelReady = false;
 
-async function requestNativePermission() {
-  const p = await PushNotifications.requestPermissions();
-  return p.receive === "granted";
+async function ensureLocalNotifications() {
+  if (!native) return false;
+  try {
+    const p = await LocalNotifications.requestPermissions();
+    if (p.display !== "granted") return false;
+    if (!localChannelReady) {
+      await LocalNotifications.createChannel({
+        id: CHANNEL_ID,
+        name: "Content Monitor alerts",
+        description: "Alerts from Content Monitor",
+        importance: 5,
+        visibility: 1,
+        sound: "default",
+        vibration: true
+      }).catch(() => {});
+      localChannelReady = true;
+    }
+    return true;
+  } catch (e) {
+    console.error("Local notification setup failed", e);
+    return false;
+  }
 }
 
-let listenersReady = false;
 async function registerDeviceToken() {
-  if (listenersReady) return;
-  listenersReady = true;
+  if (pushListenersReady) return;
+  pushListenersReady = true;
   try {
     await PushNotifications.addListener("registration", async (token) => {
       const value = String(token?.value || "").trim();
@@ -43,37 +64,38 @@ async function registerDeviceToken() {
 
 async function setupNativeNotifications(showError = true) {
   if (!native) return false;
-  try {
-    const granted = await requestNativePermission();
-    if (!granted) {
-      if (showError) alert("Notification permission was not granted. Enable notifications for Content Monitor in Android settings.");
-      return false;
-    }
-    localStorage.setItem("nativeNotificationsEnabled", "1");
-    await registerDeviceToken();
-    await PushNotifications.register();
-    return true;
-  } catch (e) {
-    console.error("Native notification setup failed", e);
-    if (showError) alert("Could not enable notifications. Please try again.");
+  const localOk = await ensureLocalNotifications();
+  if (!localOk) {
+    if (showError) alert("Android notification permission is off. Open Settings → Apps → Content Monitor → Notifications and enable it.");
     return false;
   }
+  await registerDeviceToken();
+  try {
+    const p = await PushNotifications.requestPermissions();
+    if (p.receive === "granted") await PushNotifications.register();
+  } catch (e) {
+    console.error("FCM setup failed", e);
+  }
+  localStorage.setItem("nativeNotificationsEnabled", "1");
+  return true;
 }
 
 window.contentMonitorNative.testNotification = async () => {
   if (!native) return false;
-  try {
-    const ok = await setupNativeNotifications(true);
-    if (!ok) return false;
-    await ContentMonitorNotifications.notifyAlert({
+  const ok = await setupNativeNotifications(true);
+  if (!ok) return false;
+  const id = Math.floor(Date.now() % 2147483000);
+  await LocalNotifications.schedule({
+    notifications: [{
+      id,
       title: "Content Monitor",
-      body: "Test notification is working."
-    });
-    return true;
-  } catch (e) {
-    console.error("Native test notification failed", e);
-    return false;
-  }
+      body: "Test notification is working.",
+      channelId: CHANNEL_ID,
+      schedule: { at: new Date(Date.now() + 1500), allowWhileIdle: true },
+      autoCancel: true
+    }]
+  });
+  return true;
 };
 
 if (native) {
@@ -85,10 +107,16 @@ if (native) {
       return NativeNotification.permission;
     }
     constructor(title, options = {}) {
-      ContentMonitorNotifications.notifyAlert({
-        title: String(title),
-        body: String(options.body || "")
-      }).catch((e) => console.error("Native notification failed", e));
+      LocalNotifications.schedule({
+        notifications: [{
+          id: Math.floor(Date.now() % 2147483000),
+          title: String(title),
+          body: String(options.body || ""),
+          channelId: CHANNEL_ID,
+          schedule: { at: new Date(Date.now() + 500), allowWhileIdle: true },
+          autoCancel: true
+        }]
+      }).catch(e => console.error("Native notification failed", e));
     }
   };
   window.Notification.permission =
