@@ -243,6 +243,19 @@ async function loadAlertHistory(){
   }).join("");
  }catch{box.innerHTML="<div class='empty'>Could not load alerts.</div>";}
 }
+async function deleteAllAlerts(){
+ if(!confirm("Delete all alert notifications? This cannot be undone."))return;
+ try{
+  const q=await api("delete_alerts",{});
+  const d=await q.json().catch(()=>({}));
+  if(!q.ok)throw new Error(d.error||"Delete alerts failed");
+  lastAlertId=Number(d.last_id||lastAlertId);
+  localStorage.setItem("lastAlertId",String(lastAlertId));
+  await loadAlertHistory();
+ }catch(e){alert("Could not delete notifications: "+(e.message||e));}
+}
+window.deleteAllAlerts=deleteAllAlerts;
+
 async function checkAlerts(){try{const r=await api("alerts",{after_id:lastAlertId}),d=await r.json();if(!r.ok)return;const rows=Array.isArray(d)?d:[];for(const a of rows){if(Number(a.id)<=lastAlertId)continue;playTone();lastAlertId=Number(a.id);localStorage.setItem("lastAlertId",String(lastAlertId));const reel=reelsData.find(x=>String(x.id)===String(a.content_id));const title=reel?.title||"Reel";const required=Number(reel?.alert_min_views_increase||100);const drop=a.alert_type==="metric_drop",spike=a.alert_type==="metric_spike",growth=a.alert_type==="low_views_growth",metric=a.metric||"views",label=metric==="likes"?"Likes":metric==="comments"?"Comments":metric==="shares"?"Shares":"Views";const old=Number(a["previous_"+metric]||0),cur=Number(a["current_"+metric]||0);const body=drop?(label+" dropped from "+old.toLocaleString()+" to "+cur.toLocaleString()):spike?(label+" jumped unexpectedly from "+old.toLocaleString()+" to "+cur.toLocaleString()):("Views increased by "+Number(cur-old).toLocaleString()+" (required "+required.toLocaleString()+")");showInAppAlert((drop?"DROP · ":spike?"SPIKE · ":growth?"NOT MET · ":"ALERT · ")+title,body,drop?"metric_drop":spike?"metric_spike":"low_views_growth",a.content_id);if("Notification"in window&&Notification.permission==="granted")new Notification((drop?"⚠️ ":spike?"⚡ ":"⚠️ ")+title,{body});}if(rows.length){loadReels();loadAlertHistory();}}catch{}}
 
 async function setupNotifications(){if(!("Notification"in window)){alert("Notifications are not supported here.");return;}const p=Notification.permission==="granted"?"granted":await Notification.requestPermission();if(p==="granted")alert("Notifications enabled. Android can deliver alerts even when the app is closed.");}
