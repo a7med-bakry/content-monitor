@@ -4,6 +4,47 @@ const API=SUPABASE_URL+"/functions/v1/reel-api";
 const VAPID_PUBLIC_KEY="BI4nAWrPOT2kwAyN5LkddZ7plyg79egQg33pZrV6EuFE6SJ8ORy_2Da0Fbk7Lu7VHOp6uDXELzkhGLJcYBk9uOo";
 let reelsData=[];
 let lastAlertId=Number(localStorage.getItem("lastAlertId")||0);
+let alertAudioContext=null;
+
+function unlockAlertSound(){
+ try{
+  if(!alertAudioContext)alertAudioContext=new (window.AudioContext||window.webkitAudioContext)();
+  if(alertAudioContext.state==="suspended")alertAudioContext.resume();
+ }catch{}
+}
+
+function playAlertBell(){
+ try{
+  unlockAlertSound();
+  if(!alertAudioContext)return;
+  const ctx=alertAudioContext;
+  const now=ctx.currentTime;
+  const gain=ctx.createGain();
+  gain.gain.setValueAtTime(0.0001,now);
+  gain.gain.exponentialRampToValueAtTime(0.32,now+0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001,now+0.7);
+  gain.connect(ctx.destination);
+  const osc=ctx.createOscillator();
+  osc.type="sine";
+  osc.frequency.setValueAtTime(880,now);
+  osc.frequency.exponentialRampToValueAtTime(660,now+0.7);
+  osc.connect(gain);
+  osc.start(now);
+  osc.stop(now+0.72);
+  const gain2=ctx.createGain();
+  gain2.gain.setValueAtTime(0.0001,now+0.22);
+  gain2.gain.exponentialRampToValueAtTime(0.22,now+0.24);
+  gain2.gain.exponentialRampToValueAtTime(0.0001,now+0.9);
+  gain2.connect(ctx.destination);
+  const osc2=ctx.createOscillator();
+  osc2.type="sine";
+  osc2.frequency.setValueAtTime(1175,now+0.22);
+  osc2.frequency.exponentialRampToValueAtTime(880,now+0.9);
+  osc2.connect(gain2);
+  osc2.start(now+0.22);
+  osc2.stop(now+0.92);
+ }catch{}
+}
 const reels=document.querySelector("#reels"),modal=document.querySelector("#modal"),settingsModal=document.querySelector("#settingsModal");
 
 function api(action,body={}){return fetch(API,{method:"POST",headers:{"Content-Type":"text/plain"},body:JSON.stringify({action,...body})});}
@@ -64,11 +105,12 @@ function openModal(){document.querySelector("#currentHour").textContent=new Date
 async function showHistory(id,title){const overlay=document.createElement("div");overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:10000;overflow:auto;padding:20px";overlay.innerHTML="<div style='max-width:820px;margin:30px auto;background:#111;color:#fff;border-radius:18px;padding:18px'><div style='display:flex;justify-content:space-between;align-items:center;gap:10px'><div><h2 style='margin:0'>Snapshot History</h2><div style='opacity:.65;font-size:13px'>"+esc(title)+"</div></div><button id='closeHistory' class='secondary'>Close</button></div><div id='historyBody' style='margin-top:16px'>Loading...</div></div>";document.body.appendChild(overlay);overlay.querySelector("#closeHistory").onclick=()=>overlay.remove();try{const r=await api("history",{content_id:id}),d=await r.json();if(!r.ok)throw new Error(d.error||"Failed to load history");const rows=Array.isArray(d)?d:[];overlay.querySelector("#historyBody").innerHTML=rows.length?rows.map((s,i)=>{const p=rows[i+1],dv=p?Number(s.views||0)-Number(p.views||0):null,dl=p?Number(s.likes||0)-Number(p.likes||0):null,delta=p?"Δ Views: "+(dv>=0?"+":"")+dv.toLocaleString()+" · Likes: "+(dl>=0?"+":"")+dl.toLocaleString():"First snapshot";return "<div style='padding:12px 0;border-bottom:1px solid #2b2b2b'><div style='font-size:12px;opacity:.6'>"+esc(fmt(s.captured_at))+"</div><div style='line-height:1.9'>Views <b>"+Number(s.views||0).toLocaleString()+"</b> · Likes <b>"+Number(s.likes||0).toLocaleString()+"</b> · Comments <b>"+Number(s.comments||0).toLocaleString()+"</b> · Shares <b>"+Number(s.shares||0).toLocaleString()+"</b></div><div style='font-size:12px;opacity:.7'>"+delta+"</div></div>";}).join(""):"<div class='empty'>No snapshots yet.</div>";}catch(e){overlay.querySelector("#historyBody").innerHTML="<div class='empty'>Failed to load history.<br><br>"+esc(e.message||e)+"</div>";}}
 window.showHistory=showHistory;
 
-async function checkAlerts(){try{const r=await api("alerts",{after_id:lastAlertId}),d=await r.json();if(!r.ok)return;const rows=Array.isArray(d)?d:[];for(const a of rows){if(Number(a.id)<=lastAlertId)continue;lastAlertId=Number(a.id);localStorage.setItem("lastAlertId",String(lastAlertId));const reel=reelsData.find(x=>String(x.id)===String(a.content_id));const title=reel?.title||"Reel";const required=Number(reel?.alert_min_views_increase||100);const body="Views increased by "+Number(Number(a.current_views||0)-Number(a.previous_views||0)).toLocaleString()+" (required "+required.toLocaleString()+")";if("Notification"in window&&Notification.permission==="granted")new Notification("⚠️ "+title,{body});else alert("⚠️ " + title + " | " + body);}if(rows.length)loadReels();}catch{}}
+async function checkAlerts(){try{const r=await api("alerts",{after_id:lastAlertId}),d=await r.json();if(!r.ok)return;const rows=Array.isArray(d)?d:[];for(const a of rows){if(Number(a.id)<=lastAlertId)continue;playAlertBell();lastAlertId=Number(a.id);localStorage.setItem("lastAlertId",String(lastAlertId));const reel=reelsData.find(x=>String(x.id)===String(a.content_id));const title=reel?.title||"Reel";const required=Number(reel?.alert_min_views_increase||100);const body="Views increased by "+Number(Number(a.current_views||0)-Number(a.previous_views||0)).toLocaleString()+" (required "+required.toLocaleString()+")";if("Notification"in window&&Notification.permission==="granted")new Notification("⚠️ "+title,{body});else alert("⚠️ " + title + " | " + body);}if(rows.length)loadReels();}catch{}}
 
 async function setupNotifications(){if(!("Notification"in window)){alert("Notifications are not supported here.");return;}const p=Notification.permission==="granted"?"granted":await Notification.requestPermission();if(p==="granted")alert("Notifications enabled. Keep this app open to receive live alerts.");}
 
-document.querySelector("#addBtn").onclick=openModal;
+document.addEventListener("pointerdown",unlockAlertSound,{once:true});
+document.querySelector("#addBtn").onclick=()=>{unlockAlertSound();openModal();};
 document.querySelector("#newReel").onclick=openModal;
 document.querySelector("#closeBtn").onclick=closeModal;
 document.querySelector("#saveBtn").onclick=addReel;
@@ -76,7 +118,7 @@ document.querySelector("#refreshBtn").onclick=loadReels;
 document.querySelector("#homeBtn").onclick=loadReels;
 document.querySelector("#settingsBtn").onclick=()=>settingsModal.classList.remove("hidden");
 document.querySelector("#settingsClose").onclick=()=>settingsModal.classList.add("hidden");
-document.querySelector("#enableNotifications").onclick=setupNotifications;
+document.querySelector("#enableNotifications").onclick=()=>{unlockAlertSound();setupNotifications();};
 document.querySelector("#url").addEventListener("input",()=>{const p=detectPlatform(document.querySelector("#url").value),el=document.querySelector("#platformDetected");el.classList.toggle("hidden",!p);el.textContent=p==="tiktok"?"✓ TikTok detected":"✓ Instagram detected";});
 const minuteOptions=Array.from({length:59},(_,i)=>"<option value='"+i+"'>"+i+"</option>").join("");
 document.querySelector("#alertStartMinute").innerHTML=minuteOptions;
