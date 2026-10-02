@@ -142,6 +142,38 @@ jobs:
                   call.resolve(ret);
               }
           
+              private android.media.MediaPlayer testPlayer;
+
+              @PluginMethod
+              public void playAlertSound(PluginCall call) {
+                  try {
+                      if (testPlayer != null) {
+                          try { testPlayer.stop(); } catch (Exception ignored) {}
+                          testPlayer.release();
+                      }
+                      testPlayer = android.media.MediaPlayer.create(getContext(), com.contentmonitor.app.R.raw.alert_siren);
+                      if (testPlayer == null) {
+                          call.reject("Could not load alert_siren.wav");
+                          return;
+                      }
+                      testPlayer.setOnCompletionListener(mp -> {
+                          mp.release();
+                          testPlayer = null;
+                      });
+                      testPlayer.start();
+                      new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                          if (testPlayer != null) {
+                              try { testPlayer.stop(); } catch (Exception ignored) {}
+                              testPlayer.release();
+                              testPlayer = null;
+                          }
+                      }, 15000);
+                      call.resolve();
+                  } catch (Exception e) {
+                      call.reject("Alert sound failed: " + e.getMessage());
+                  }
+              }
+
               @PluginMethod
               public void notifyAlert(PluginCall call) {
                   showNotification(call.getString("title", "Content Monitor"), call.getString("body", ""));
