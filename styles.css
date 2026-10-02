@@ -14,7 +14,7 @@
 
 /* reel row stats */
 .reel-stats{display:flex;align-items:center;gap:7px;flex:0 0 auto}
-.mini-stat{min-width:76px;height:44px;padding:7px 9px;border-radius:13px;border:1px solid #273140;background:linear-gradient(180deg,#171e28,#111720);display:flex;align-items:center;gap:7px;box-shadow:inset 0 1px 0 #ffffff06}
+.mini-stat{min-width:76px;height:42px;padding:7px 10px;justify-content:center;border-radius:13px;border:1px solid #273140;background:linear-gradient(180deg,#171e28,#111720);display:flex;align-items:center;gap:7px;box-shadow:inset 0 1px 0 #ffffff06}
 .mini-stat .mini-icon{width:22px;height:22px;display:grid;place-items:center;border-radius:8px;font-size:10px;flex:0 0 22px}
 .views-stat .mini-icon{color:#71e3ad;background:#133326}
 .likes-stat .mini-icon{color:#ff7184;background:#3a1720}
