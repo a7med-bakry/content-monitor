@@ -211,21 +211,37 @@ window.showHistory=showHistory;
 function playTone(){
  try{
   unlockAlertSound(); if(!alertAudioContext)return;
-  const ctx=alertAudioContext,now=ctx.currentTime;
-  const duration=15,cycle=1.8;
+  const ctx=alertAudioContext,now=ctx.currentTime,duration=15;
+  const g=ctx.createGain(),o=ctx.createOscillator(),o2=ctx.createOscillator(),g2=ctx.createGain();
+  g.gain.setValueAtTime(0.0001,now);
+  g.gain.linearRampToValueAtTime(0.38,now+0.08);
+  g.gain.setValueAtTime(0.38,now+14.55);
+  g.gain.linearRampToValueAtTime(0.0001,now+15);
+  g.connect(ctx.destination);
+  g2.gain.setValueAtTime(0.0001,now);
+  g2.gain.linearRampToValueAtTime(0.11,now+0.08);
+  g2.gain.setValueAtTime(0.11,now+14.55);
+  g2.gain.linearRampToValueAtTime(0.0001,now+15);
+  g2.connect(ctx.destination);
+  const cycle=3.0;
+  o.type="sine";
+  o.frequency.setValueAtTime(480,now);
   for(let t=0;t<duration;t+=cycle){
-   const g=ctx.createGain(),o=ctx.createOscillator();
    const at=now+t;
-   g.gain.setValueAtTime(.0001,at);
-   g.gain.exponentialRampToValueAtTime(.34,at+.04);
-   g.gain.setValueAtTime(.34,at+.72);
-   g.gain.exponentialRampToValueAtTime(.0001,at+1.65);
-   o.type="sawtooth";
-   o.frequency.setValueAtTime(780,at);
-   o.frequency.linearRampToValueAtTime(520,at+.9);
-   o.frequency.linearRampToValueAtTime(780,at+1.8);
-   o.connect(g);g.connect(ctx.destination);o.start(at);o.stop(at+1.82);
+   o.frequency.setValueAtTime(480,at);
+   o.frequency.linearRampToValueAtTime(1080,at+1.35);
+   o.frequency.linearRampToValueAtTime(480,at+2.85);
   }
+  o.connect(g);o.start(now);o.stop(now+15.02);
+  o2.type="sine";
+  o2.frequency.setValueAtTime(960,now);
+  for(let t=0;t<duration;t+=cycle){
+   const at=now+t;
+   o2.frequency.setValueAtTime(960,at);
+   o2.frequency.linearRampToValueAtTime(2160,at+1.35);
+   o2.frequency.linearRampToValueAtTime(960,at+2.85);
+  }
+  o2.connect(g2);o2.start(now);o2.stop(now+15.02);
  }catch{}
 }
 function showInAppAlert(title,body,type="alert",contentId=""){
@@ -251,18 +267,27 @@ async function loadAlertHistory(){
    const msg=drop?metric+" dropped from "+old.toLocaleString()+" to "+cur.toLocaleString():spike?metric+" jumped unexpectedly from "+old.toLocaleString()+" to "+cur.toLocaleString():"Views increased by "+(cur-old).toLocaleString()+" (required growth was not met).";
    const label=drop?"DROP":spike?"SPIKE":growth?"NOT MET":"ALERT";
    const cls=drop?"drop":spike?"spike":growth?"growth":"warning";
-   return "<button class='alert-item "+cls+"' onclick='showDetails("+JSON.stringify(String(a.content_id))+")'><b>"+esc(a.title||"Clip")+"</b><span>"+esc(fmt(a.created_at))+" · "+label+"</span><small>"+esc(msg)+"</small></button>";
+   return "<div class='alert-item "+cls+"'><button class='alert-main' onclick='showDetails("+JSON.stringify(String(a.content_id))+")'><span class='alert-item-copy'><b>"+esc(a.title||"Clip")+"</b><span>"+esc(fmt(a.created_at))+" · "+label+"</span><small>"+esc(msg)+"</small></span></button><button class='alert-delete' title='Delete alert' aria-label='Delete alert' onclick='event.stopPropagation();deleteAlert("+Number(a.id)+")'>🗑</button></div>";
   }).join("");
  }catch{box.innerHTML="<div class='empty'>Could not load alerts.</div>";}
 }
+async function deleteAlert(id){
+ try{
+  const q=await api("delete_alert",{id:Number(id)});
+  const d=await q.json().catch(()=>({}));
+  if(!q.ok)throw new Error(d.error||"Delete alert failed");
+  await loadAlertHistory();
+ }catch(e){alert("Could not delete alert: "+(e.message||e));}
+}
+window.deleteAlert=deleteAlert;
 async function deleteAllAlerts(){
  if(!confirm("Delete all alert notifications? This cannot be undone."))return;
  try{
   const q=await api("delete_alerts",{});
   const d=await q.json().catch(()=>({}));
   if(!q.ok)throw new Error(d.error||"Delete alerts failed");
-  lastAlertId=Number(d.last_id||lastAlertId);
-  localStorage.setItem("lastAlertId",String(lastAlertId));
+  lastAlertId=0;
+  localStorage.setItem("lastAlertId","0");
   await loadAlertHistory();
  }catch(e){alert("Could not delete notifications: "+(e.message||e));}
 }
