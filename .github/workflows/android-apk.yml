@@ -151,7 +151,7 @@ jobs:
               public static void ensureAlertChannel(Context context) {
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                       NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-                      String channelId = "content_monitor_alerts";
+                      String channelId = "content_monitor_alerts_v2";
                       if (manager.getNotificationChannel(channelId) == null) {
                           NotificationChannel channel = new NotificationChannel(channelId, "Content Monitor alerts", NotificationManager.IMPORTANCE_HIGH);
                           Uri sound = Uri.parse("android.resource://" + context.getPackageName() + "/" + com.contentmonitor.app.R.raw.alert_siren);
@@ -176,7 +176,7 @@ jobs:
                   Context context = getContext();
                   NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
                   Uri sound = getSavedSound();
-                  String channelId = "content_monitor_alerts";
+                  String channelId = "content_monitor_alerts_v2";
           
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                       NotificationChannel channel = manager.getNotificationChannel(channelId);
@@ -255,7 +255,7 @@ jobs:
           from pathlib import Path
           p=Path("android/app/src/main/AndroidManifest.xml")
           s=p.read_text()
-          meta='<meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="content_monitor_alerts" />'
+          meta='<meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="content_monitor_alerts_v2" />'
           if 'com.google.firebase.messaging.default_notification_channel_id' not in s:
               pos=s.rfind('</application>')
               if pos<0: raise SystemExit('application tag not found')
