@@ -208,12 +208,24 @@ function openModal(){document.querySelector("#currentHour").textContent=new Date
 async function showHistory(id,title){const overlay=document.createElement("div");overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:10000;overflow:auto;padding:20px";overlay.innerHTML="<div style='max-width:820px;margin:30px auto;background:#111;color:#fff;border-radius:18px;padding:18px'><div style='display:flex;justify-content:space-between;align-items:center;gap:10px'><div><h2 style='margin:0'>Snapshot History</h2><div style='opacity:.65;font-size:13px'>"+esc(title)+"</div></div><button id='closeHistory' class='secondary'>Close</button></div><div id='historyBody' style='margin-top:16px'>Loading...</div></div>";document.body.appendChild(overlay);overlay.querySelector("#closeHistory").onclick=()=>overlay.remove();try{const r=await api("history",{content_id:id}),d=await r.json();if(!r.ok)throw new Error(d.error||"Failed to load history");const rows=Array.isArray(d)?d:[];overlay.querySelector("#historyBody").innerHTML=rows.length?rows.map((s,i)=>{const p=rows[i+1],dv=p?Number(s.views||0)-Number(p.views||0):null,dl=p?Number(s.likes||0)-Number(p.likes||0):null,delta=p?"Δ Views: "+(dv>=0?"+":"")+dv.toLocaleString()+" · Likes: "+(dl>=0?"+":"")+dl.toLocaleString():"First snapshot";return "<div style='padding:12px 0;border-bottom:1px solid #2b2b2b'><div style='font-size:12px;opacity:.6'>"+esc(fmt(s.captured_at))+"</div><div style='line-height:1.9'>Views <b>"+Number(s.views||0).toLocaleString()+"</b> · Likes <b>"+Number(s.likes||0).toLocaleString()+"</b> · Comments <b>"+Number(s.comments||0).toLocaleString()+"</b> · Shares <b>"+Number(s.shares||0).toLocaleString()+"</b></div><div style='font-size:12px;opacity:.7'>"+delta+"</div></div>";}).join(""):"<div class='empty'>No snapshots yet.</div>";}catch(e){overlay.querySelector("#historyBody").innerHTML="<div class='empty'>Failed to load history.<br><br>"+esc(e.message||e)+"</div>";}}
 window.showHistory=showHistory;
 
-function playTone(kind=alertTone){
+function playTone(){
  try{
   unlockAlertSound(); if(!alertAudioContext)return;
   const ctx=alertAudioContext,now=ctx.currentTime;
-  const sets={bell:[880,660],double:[880,660,880],beep:[950],alarm:[900,650,900,650]};
-  (sets[kind]||sets.bell).forEach((f,i)=>{const t=now+i*.18,g=ctx.createGain(),o=ctx.createOscillator();g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.3,t+.02);g.gain.exponentialRampToValueAtTime(.0001,t+.5);o.frequency.value=f;o.connect(g);g.connect(ctx.destination);o.start(t);o.stop(t+.52);});
+  const duration=15,cycle=1.8;
+  for(let t=0;t<duration;t+=cycle){
+   const g=ctx.createGain(),o=ctx.createOscillator();
+   const at=now+t;
+   g.gain.setValueAtTime(.0001,at);
+   g.gain.exponentialRampToValueAtTime(.34,at+.04);
+   g.gain.setValueAtTime(.34,at+.72);
+   g.gain.exponentialRampToValueAtTime(.0001,at+1.65);
+   o.type="sawtooth";
+   o.frequency.setValueAtTime(780,at);
+   o.frequency.linearRampToValueAtTime(520,at+.9);
+   o.frequency.linearRampToValueAtTime(780,at+1.8);
+   o.connect(g);g.connect(ctx.destination);o.start(at);o.stop(at+1.82);
+  }
  }catch{}
 }
 function showInAppAlert(title,body,type="alert",contentId=""){
