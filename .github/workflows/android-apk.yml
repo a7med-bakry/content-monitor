@@ -148,6 +148,21 @@ jobs:
                   call.resolve();
               }
           
+              public static void ensureAlertChannel(Context context) {
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+                      String channelId = "content_monitor_alerts";
+                      if (manager.getNotificationChannel(channelId) == null) {
+                          NotificationChannel channel = new NotificationChannel(channelId, "Content Monitor alerts", NotificationManager.IMPORTANCE_HIGH);
+                          Uri sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
+                          AudioAttributes attrs = new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION).build();
+                          channel.setSound(sound, attrs);
+                          channel.enableVibration(true);
+                          manager.createNotificationChannel(channel);
+                      }
+                  }
+              }
+          
               private Uri getSavedSound() {
                   String value = getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(SOUND_URI, "");
                   return value == null || value.isEmpty() ? null : Uri.parse(value);
@@ -210,6 +225,7 @@ jobs:
               public void onCreate(Bundle savedInstanceState) {
                   registerPlugin(ContentMonitorNotificationsPlugin.class);
                   super.onCreate(savedInstanceState);
+                  ContentMonitorNotificationsPlugin.ensureAlertChannel(this);
               }
           }
           
