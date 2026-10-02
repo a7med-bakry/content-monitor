@@ -11,6 +11,8 @@ let alertSoundUnlocked=false;
 let alertAudio=null;
 let alertAudioPrimed=false;
 
+async function unlockAlertSound(){return primeAlertAudio();}
+
 async function primeAlertAudio(){
  try{
   if(!alertAudio)alertAudio=new Audio(ALERT_SOUND_DATA);
