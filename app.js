@@ -165,7 +165,7 @@ async function loadAlertHistory(){
  const box=document.querySelector("#alertList"); if(!box)return;
  try{
   const q=await api("alerts_history"),rows=await q.json(); if(!q.ok)throw new Error();
-  if(!rows.length){box.innerHTML="<div class='empty'>No alerts yet.</div>";return;}
+  if(!rows.length){box.innerHTML="<div class='empty'>No alerts yet.</div>";updateAlertBadge(0);return;}updateAlertBadge(rows.length);
   box.innerHTML=rows.map(a=>{
    const metric=a.metric==="likes"?"Likes":a.metric==="comments"?"Comments":a.metric==="shares"?"Shares":"Views";
    const drop=a.alert_type==="metric_drop",spike=a.alert_type==="metric_spike",growth=a.alert_type==="low_views_growth";
