@@ -244,3 +244,7 @@
  .totals-small>div span{font-size:7px!important}
  .totals-small>div strong{font-size:12px!important}
 }
+
+/* Match Monitoring action button size with the other reel actions */
+.detail-actions .primary{height:44px!important;padding:11px 13px!important;font-size:12px!important;margin-top:0!important;}
+.detail-actions .secondary{height:44px!important;padding:11px 13px!important;font-size:12px!important;display:flex!important;align-items:center!important;justify-content:center!important;}
