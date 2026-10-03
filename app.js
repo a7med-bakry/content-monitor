@@ -221,9 +221,15 @@ window.showHistory=showHistory;
 async function loadAlertHistory(){
  const box=document.querySelector("#alertList"); if(!box)return;
  try{
-  const q=await api("alerts_history"),rows=await q.json(); if(!q.ok)throw new Error();
-  if(!rows.length){box.innerHTML="<div class='empty'>No alerts yet.</div>";updateAlertBadge(0);return;}updateAlertBadge(rows.length);
-  box.innerHTML=rows.map(a=>{
+  const q=await api("alerts_history"),rawRows=await q.json(); if(!q.ok)throw new Error();
+  const rows=Array.isArray(rawRows)?rawRows:[];
+  const seen=new Set();
+  const uniqueRows=rows.filter(a=>{
+    const key=a.alert_key||[a.content_id,a.alert_type,a.metric,a.previous_views,a.current_views,a.previous_likes,a.current_likes,a.previous_comments,a.current_comments,a.previous_shares,a.current_shares,a.previous_saves,a.current_saves].join("|");
+    if(seen.has(key))return false; seen.add(key); return true;
+  });
+  if(!uniqueRows.length){box.innerHTML="<div class='empty'>No alerts yet.</div>";updateAlertBadge(0);return;}updateAlertBadge(uniqueRows.length);
+  box.innerHTML=uniqueRows.map(a=>{
    const metric=a.metric==="likes"?"Likes":a.metric==="comments"?"Comments":a.metric==="shares"?"Shares":"Views";
    const drop=a.alert_type==="metric_drop",spike=a.alert_type==="metric_spike",growth=a.alert_type==="low_views_growth";
    const old=Number((drop||spike)?(a["previous_"+(a.metric||"views")]||0):a.previous_views||0);
