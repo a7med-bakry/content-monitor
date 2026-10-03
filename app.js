@@ -152,15 +152,6 @@ function openModal(){document.querySelector("#url").value="";document.querySelec
 async function showHistory(id,title){const overlay=document.createElement("div");overlay.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:10000;overflow:auto;padding:20px";overlay.innerHTML="<div style='max-width:820px;margin:30px auto;background:#111;color:#fff;border-radius:18px;padding:18px'><div style='display:flex;justify-content:space-between;align-items:center;gap:10px'><div><h2 style='margin:0'>Snapshot History</h2><div style='opacity:.65;font-size:13px'>"+esc(title)+"</div></div><button id='closeHistory' class='secondary'>Close</button></div><div id='historyBody' style='margin-top:16px'>Loading...</div></div>";document.body.appendChild(overlay);overlay.querySelector("#closeHistory").onclick=()=>overlay.remove();try{const r=await api("history",{content_id:id}),d=await r.json();if(!r.ok)throw new Error(d.error||"Failed to load history");const rows=Array.isArray(d)?d:[];overlay.querySelector("#historyBody").innerHTML=rows.length?rows.map((s,i)=>{const p=rows[i+1],dv=p?Number(s.views||0)-Number(p.views||0):null,dl=p?Number(s.likes||0)-Number(p.likes||0):null,delta=p?"Δ Views: "+(dv>=0?"+":"")+dv.toLocaleString()+" · Likes: "+(dl>=0?"+":"")+dl.toLocaleString():"First snapshot";return "<div style='padding:12px 0;border-bottom:1px solid #2b2b2b'><div style='font-size:12px;opacity:.6'>"+esc(fmt(s.captured_at))+"</div><div style='line-height:1.9'>Views <b>"+Number(s.views||0).toLocaleString()+"</b> · Likes <b>"+Number(s.likes||0).toLocaleString()+"</b> · Comments <b>"+Number(s.comments||0).toLocaleString()+"</b> · Shares <b>"+Number(s.shares||0).toLocaleString()+"</b></div><div style='font-size:12px;opacity:.7'>"+delta+"</div></div>";}).join(""):"<div class='empty'>No snapshots yet.</div>";}catch(e){overlay.querySelector("#historyBody").innerHTML="<div class='empty'>Failed to load history.<br><br>"+esc(e.message||e)+"</div>";}}
 window.showHistory=showHistory;
 
-function if(old)old.remove();
- const el=document.createElement("button");
- el.className="in-app-alert "+(type==="metric_drop"?"drop":type==="metric_spike"?"spike":"warning");
- el.innerHTML="<span class='alert-symbol'>"+(type==="metric_drop"?"↓":type==="metric_spike"?"⚡":"!")+"</span><span class='alert-copy'><b>"+esc(title)+"</b><small>"+esc(body)+"</small></span><span class='alert-open'>›</span>";
- el.onclick=()=>{el.remove();if(contentId){document.querySelector(".detail-modal")?.remove();showDetails(contentId);}};
- document.body.appendChild(el);
- requestAnimationFrame(()=>el.classList.add("show"));
- setTimeout(()=>{el.classList.remove("show");setTimeout(()=>el.remove(),250)},9000);
-}
 async function loadAlertHistory(){
  const box=document.querySelector("#alertList"); if(!box)return;
  try{
