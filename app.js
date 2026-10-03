@@ -187,7 +187,7 @@ async function toggleMonitoring(id,isActive){if(!confirm(isActive?"Stop monitori
 async function toggleNotifications(id,isEnabled){try{const q=await api("update",{content_id:id,notifications_enabled:!isEnabled});const d=await q.json();if(!q.ok)throw new Error(d.error||"Update failed");const i=reelsData.findIndex(x=>String(x.id)===String(id));if(i>=0)reelsData[i]={...reelsData[i],...(d.reel||{})};document.querySelector(".detail-modal")?.remove();render();showDetails(id);}catch(e){alert("Could not change alerts: "+(e.message||e));}}
 window.toggleNotifications=toggleNotifications;
 async function deleteClip(id){if(!confirm("Delete this clip and all its snapshot/alert history? This cannot be undone."))return;try{const q=await api("delete",{content_id:id});const d=await q.json();if(!q.ok)throw new Error(d.error||"Delete failed");reelsData=reelsData.filter(x=>String(x.id)!==String(id));document.querySelector(".detail-modal")?.remove();render();}catch(e){alert("Could not delete clip: "+(e.message||e));}}
-async function copyClipLink(id){const u=location.origin+"/clip/"+encodeURIComponent(String(id));try{await navigator.clipboard.writeText(u);alert("Clip link copied");}catch{prompt("Copy this clip link:",u);}}
+async function copyClipLink(id){const r=reelsData.find(x=>String(x.id)===String(id));const u=r?.url||location.origin+"/clip/"+encodeURIComponent(String(id));try{await navigator.clipboard.writeText(u);alert("Reel link copied");}catch{prompt("Copy this Reel link:",u);}}
 window.copyClipLink=copyClipLink;
 window.toggleMonitoring=toggleMonitoring;window.deleteClip=deleteClip;
 window.editMonitoring=editMonitoring;window.editMonitoring=editMonitoring;
