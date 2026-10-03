@@ -209,3 +209,5 @@
 .monitor-snap .neutral{color:#8f9bad}
 .monitor-snaps-empty{padding:12px 2px;color:#6f7b8d;font-size:10px;text-align:center}
 @media(max-width:650px){.monitor-snap{grid-template-columns:1.25fr .75fr .75fr;gap:5px}.monitor-snap b:nth-of-type(2),.monitor-snap em:nth-of-type(2){display:none}.monitor-snap{font-size:9px}.monitor-snap b{font-size:9px}.monitor-snap em{font-size:8px}}
+
+.monitor-result{overflow:hidden}.monitor-result.collapsed{display:none}.monitor-result.open{display:block}.monitor-snaps{border:1px solid #202632;border-radius:12px;padding:4px 9px;background:#0a0e14}.monitor-snaps-empty{padding:9px 4px;font-size:10px;color:#778295;text-align:center}.monitor-growth{padding:8px 2px}.monitor-row .monitor-expand{z-index:2;position:relative;cursor:pointer}
