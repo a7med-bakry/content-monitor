@@ -91,45 +91,26 @@ async function showMonitoring(id){
  const body=overlay.querySelector("#monitorBody");
  let history=[];
  const renderGrowth=()=>{
-  const startMin=Number(r.alert_window_start_minute??1),endMin=Number(r.alert_window_end_minute??15),repeat=Math.max(1,Number(r.alert_repeat_minutes||60)),minViews=Math.max(1,Number(r.alert_min_views_increase||100));
-  const snaps=history.slice().sort((a,b)=>new Date(a.captured_at)-new Date(b.captured_at));
-  if(!snaps.length){body.innerHTML="<div class='empty'>No snapshots yet.</div>";return;}
-  const latestMs=new Date(snaps[snaps.length-1].captured_at).getTime();
-  const duration=(endMin-startMin)*60000;
-  let first=r.alert_anchor_at?new Date(r.alert_anchor_at):null;
-  if(!first||!Number.isFinite(first.getTime())){
-    first=new Date(r.monitor_start_at||snaps[0].captured_at);
-    first.setSeconds(0,0);first.setMinutes(startMin);
-    if(first.getTime()<new Date(r.monitor_start_at||snaps[0].captured_at).getTime())first=new Date(first.getTime()+3600000);
-  }
-  const windows=[];let ws=new Date(first),guard=0;
-  while(ws.getTime()<=latestMs&&guard++<500){
-    const we=new Date(ws.getTime()+duration);
-    const inside=snaps.filter(s=>{const t=new Date(s.captured_at).getTime();return t>=ws.getTime()&&t<=we.getTime();});
-    const baseline=[...snaps].reverse().find(s=>new Date(s.captured_at).getTime()<=ws.getTime());
-    const finish=[...snaps].reverse().find(s=>new Date(s.captured_at).getTime()<=we.getTime()&&new Date(s.captured_at).getTime()>=ws.getTime());
-    const complete=latestMs>=we.getTime();
-    const hasResult=complete&&baseline&&finish&&baseline.views!=null&&finish.views!=null;
-    const delta=hasResult?Number(finish.views)-Number(baseline.views):null;
-    const status=!complete?"pending":hasResult?(delta>=minViews?"pass":"fail"):"nodata";
-    windows.push({ws,we,inside,baseline,finish,complete,hasResult,delta,status});
-    ws=new Date(ws.getTime()+repeat*60000);
-  }
-  if(!windows.length){body.innerHTML="<div class='empty'>No monitoring window has started yet.</div>";return;}
-  body.innerHTML="<div class='monitor-summary'><span>Window "+startMin+"–"+endMin+" · every "+repeat+" min</span><b>Minimum increase: "+minViews.toLocaleString()+" views</b></div>"+windows.reverse().map((w,i)=>{
-   const snapsHtml=w.inside.map((s,j)=>{const prev=w.inside[j-1],d=prev?Number(s.views||0)-Number(prev.views||0):0;return "<div class='monitor-snap'><span>"+esc(fmt(s.captured_at))+"</span><b>"+Number(s.views||0).toLocaleString()+"</b><em class='"+(d>=0?"up":"down")+"'>"+(prev?(d>=0?"+":"")+d.toLocaleString()+" views":"start")+"</em></div>"}).join("");
-   const label=w.status==="pass"?"PASS":w.status==="fail"?"NOT MET":w.status==="pending"?"IN PROGRESS":"NO DATA";
-   const result=w.hasResult?(w.delta>=0?"+":"")+w.delta.toLocaleString():"—";
-   const help=w.hasResult?"required ≥ "+minViews.toLocaleString():(w.complete?"No usable snapshot inside this window yet":"Waiting for the window to finish");
-   return "<div class='monitor-row'><div class='monitor-row-top'><div class='monitor-number'>"+(windows.length-i)+"</div><div class='monitor-period'><b>"+esc(fmt(w.ws))+" → "+esc(fmt(w.we))+"</b><small>"+w.inside.length+" snapshots</small></div><div class='monitor-status "+w.status+"'>"+label+"</div></div><div class='monitor-result'><span>Views increase</span><strong>"+result+"</strong><small>"+help+"</small></div><div class='monitor-snaps'>"+(snapsHtml||"<div class='empty' style='padding:16px'>No snapshots in this window yet.</div>")+"</div></div>";
-  }).join("");
+  const targets=hourlyTargets(r),snaps=history.slice().sort((a,b)=>new Date(a.captured_at)-new Date(b.captured_at)),nowHour=localHour();
+  const fmtHour=(ts)=>Number(new Date(ts).toLocaleTimeString("en-US",{hour:"2-digit",hour12:false,timeZone:"Africa/Cairo"}));
+  const byHour={};for(const x of snaps){const h=fmtHour(x.captured_at);(byHour[h]||(byHour[h]=[])).push(x);}
+  const rows=Array.from({length:24},(_,h)=>{const t=targets[String(h)]||targets[String(h).padStart(2,"0")]||{},minV=Number(t.views||0),minL=Number(t.likes||0),arr=byHour[h]||[],baseline=snaps.filter(x=>new Date(x.captured_at).toLocaleTimeString("en-US",{hour:"2-digit",hour12:false,timeZone:"Africa/Cairo"})==="00:00").length?null:null;return {h,minV,minL,arr};});
+  body.innerHTML="<div class='monitor-summary'><span>Fixed clock hours · Cairo time</span><b>Targets are checked after each hour closes</b></div>"+rows.map(w=>{
+    const arr=w.arr,has=w.minV>0||w.minL>0,first=arr[0],last=arr[arr.length-1],complete=w.h!==nowHour;
+    let status="no-target",result="—";
+    if(has&&first&&last&&complete){const dv=Number(last.views||0)-Number(first.views||0),dl=Number(last.likes||0)-Number(first.likes||0);const pass=(w.minV<=0||dv>=w.minV)&&(w.minL<=0||dl>=w.minL);status=pass?"pass":"fail";result="+"+dv.toLocaleString()+" views · +"+dl.toLocaleString()+" likes";}
+    else if(has&&w.h===nowHour)status="pending";
+    const label=status==="pass"?"PASS":status==="fail"?"NOT MET":status==="pending"?"IN PROGRESS":has?"NO DATA":"—";
+    return "<div class='monitor-row'><div class='monitor-row-top'><div class='monitor-number'>"+String(w.h).padStart(2,"0")+"</div><div class='monitor-period'><b>"+String(w.h).padStart(2,"0")+":00 – "+String(w.h).padStart(2,"0")+":59</b><small>Min views: "+(w.minV||0).toLocaleString()+" · Min likes: "+(w.minL||0).toLocaleString()+" · "+arr.length+" snapshots</small></div><div class='monitor-status "+status+"'>"+label+"</div></div><div class='monitor-result'><span>Actual growth</span><strong>"+result+"</strong></div></div>";
+  }).reverse().join("");
  };
  const renderDrops=()=>{
   const snaps=history.slice().sort((a,b)=>new Date(a.captured_at)-new Date(b.captured_at)),drops=[];
-  for(let i=1;i<snaps.length;i++){const p=snaps[i-1],s=snaps[i],dv=Number(s.views||0)-Number(p.views||0),dl=Number(s.likes||0)-Number(p.likes||0);if(dv<0||dl<0)drops.push({s,p,dv,dl});}
+  for(let i=1;i<snaps.length;i++){const p=snaps[i-1],s=snaps[i],m=[["views",p.views,s.views],["likes",p.likes,s.likes],["comments",p.comments,s.comments],["shares",p.shares,s.shares],["saves",p.saves,s.saves]].filter(x=>x[1]!=null&&x[2]!=null&&Number(x[2])<Number(x[1]));if(m.length)drops.push({s,p,m});}
   if(!drops.length){body.innerHTML="<div class='empty'>No drops detected yet.</div>";return;}
-  body.innerHTML="<div class='drop-monitor-summary'>Any snapshot with a decrease in views or likes appears here.</div>"+drops.reverse().map((d,i)=>"<div class='drop-row'><div class='drop-row-head'><div class='monitor-number'>"+(drops.length-i)+"</div><b>"+esc(fmt(d.s.captured_at))+"</b><span class='drop-badge'>DROP</span></div><div class='drop-metrics'>"+(d.dv<0?"<div><span>Views</span><b class='down'>"+Number(d.p.views||0).toLocaleString()+" → "+Number(d.s.views||0).toLocaleString()+" ("+d.dv.toLocaleString()+")</b></div>":"")+" "+(d.dl<0?"<div><span>Likes</span><b class='down'>"+Number(d.p.likes||0).toLocaleString()+" → "+Number(d.s.likes||0).toLocaleString()+" ("+d.dl.toLocaleString()+")</b></div>":"")+"</div></div>").join("");
+  body.innerHTML="<div class='drop-monitor-summary'>Any snapshot with a decrease in views, likes, comments, shares or saves appears here.</div>"+drops.reverse().map((d,i)=>"<div class='drop-row'><div class='drop-row-head'><div class='monitor-number'>"+(drops.length-i)+"</div><b>"+esc(fmt(d.s.captured_at))+"</b><span class='drop-badge'>DROP</span></div><div class='drop-metrics'>"+d.m.map(x=>"<div><span>"+x[0].toUpperCase()+"</span><b class='down'>"+Number(x[1]).toLocaleString()+" → "+Number(x[2]).toLocaleString()+" ("+(Number(x[2])-Number(x[1])).toLocaleString()+")</b></div>").join("")+"</div></div>").join("");
  };
+
  body.innerHTML="<div class='loading'>Loading monitoring...</div>";
  try{const q=await api("history",{content_id:id}),rows=await q.json();if(!q.ok)throw new Error(rows.error||"Failed to load history");history=Array.isArray(rows)?rows:[];renderGrowth();}catch(e){body.innerHTML="<div class='empty'>Failed to load monitoring.<br><br>"+esc(e.message||e)+"</div>";}
  overlay.querySelectorAll(".monitor-tab").forEach(btn=>btn.onclick=()=>{overlay.querySelectorAll(".monitor-tab").forEach(x=>x.classList.remove("active"));btn.classList.add("active");btn.dataset.tab==="drops"?renderDrops():renderGrowth();});
