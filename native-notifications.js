@@ -43,7 +43,7 @@ async function registerDeviceToken() {
       try {
         const r = await fetch("https://rwnesehhsblejmrbzzsu.supabase.co/functions/v1/reel-api", {
           method: "POST",
-          headers: {"Content-Type":"application/json"},
+          headers: {"Content-Type":"application/json","apikey":"sb_publishable_3vG6klw0_89fiTeXRcFPdg_EmtjhDWi","Authorization":"Bearer sb_publishable_3vG6klw0_89fiTeXRcFPdg_EmtjhDWi"},
           body: JSON.stringify({action:"register_push", token:value, platform:"android"})
         });
         if (!r.ok) console.error("Push token API rejected:", await r.text());
@@ -84,17 +84,17 @@ window.contentMonitorNative.testNotification = async () => {
   if (!native) return false;
   const ok = await setupNativeNotifications(true);
   if (!ok) return false;
-  const id = Math.floor(Date.now() % 2147483000);
-  await LocalNotifications.schedule({
-    notifications: [{
-      id,
-      title: "Content Monitor",
-      body: "Test notification is working.",
-      channelId: CHANNEL_ID,
-      schedule: { at: new Date(Date.now() + 1500), allowWhileIdle: true },
-      autoCancel: true
-    }]
+  const r = await fetch("https://rwnesehhsblejmrbzzsu.supabase.co/functions/v1/social-snapshots", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": "sb_publishable_3vG6klw0_89fiTeXRcFPdg_EmtjhDWi",
+      "Authorization": "Bearer sb_publishable_3vG6klw0_89fiTeXRcFPdg_EmtjhDWi"
+    },
+    body: JSON.stringify({action:"test_push"})
   });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || d.ok === false) throw new Error(d.error || "FCM test failed");
   return true;
 };
 
