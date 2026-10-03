@@ -109,19 +109,31 @@ async function showMonitoring(id){
  const body=overlay.querySelector("#monitorBody");
  let history=[];
  const renderGrowth=()=>{
-  const targets=hourlyTargets(r),snaps=history.slice().sort((a,b)=>new Date(a.captured_at)-new Date(b.captured_at)),nowHour=localHour();
-  const fmtHour=(ts)=>Number(new Date(ts).toLocaleTimeString("en-US",{hour:"2-digit",hour12:false,timeZone:"Africa/Cairo"}));
-  const byHour={};for(const x of snaps){const h=fmtHour(x.captured_at);(byHour[h]||(byHour[h]=[])).push(x);}
-  const rows=Array.from({length:24},(_,h)=>{const t=targets[String(h)]||targets[String(h).padStart(2,"0")]||{},minV=Number(t.views||0),minL=Number(t.likes||0),arr=byHour[h]||[],baseline=snaps.filter(x=>new Date(x.captured_at).toLocaleTimeString("en-US",{hour:"2-digit",hour12:false,timeZone:"Africa/Cairo"})==="00:00").length?null:null;return {h,minV,minL,arr};});
-  body.innerHTML="<div class='monitor-summary'><span>Fixed clock hours · Cairo time</span><b>Targets are checked after each hour closes</b></div>"+rows.map(w=>{
-    const arr=w.arr,has=w.minV>0||w.minL>0,first=arr[0],last=arr[arr.length-1],complete=w.h!==nowHour;
-    let status="no-target",result="—";
-    if(has&&first&&last&&complete){const dv=Number(last.views||0)-Number(first.views||0),dl=Number(last.likes||0)-Number(first.likes||0);const pass=(w.minV<=0||dv>=w.minV)&&(w.minL<=0||dl>=w.minL);status=pass?"pass":"fail";result="+"+dv.toLocaleString()+" views · +"+dl.toLocaleString()+" likes";}
-    else if(has&&w.h===nowHour)status="pending";
-    const label=status==="pass"?"PASS":status==="fail"?"NOT MET":status==="pending"?"IN PROGRESS":has?"NO DATA":"—";
-    const snapshotList=arr.length?arr.slice().sort((a,b)=>new Date(b.captured_at)-new Date(a.captured_at)).map((s,i,a)=>{const prev=a[i+1],dv=prev?Number(s.views||0)-Number(prev.views||0):0,dl=prev?Number(s.likes||0)-Number(prev.likes||0):0;return "<div class='monitor-snap'><span>"+esc(fmt(s.captured_at))+"</span><b>"+Number(s.views||0).toLocaleString()+" views</b><em class='"+(dv>0?"up":dv<0?"down":"neutral")+"'>"+(dv>=0?"+":"")+dv.toLocaleString()+" views</em><b>"+Number(s.likes||0).toLocaleString()+" likes</b><em class='"+(dl>0?"up":dl<0?"down":"neutral")+"'>"+(dl>=0?"+":"")+dl.toLocaleString()+" likes</em></div>";}).join(""):"<div class='monitor-snaps-empty'>No data yet for this hour.</div>";const resultBox=arr.length?"<div class='monitor-growth'><span>Actual growth</span><strong>"+result+"</strong></div>":"";return "<div class='monitor-row'><div class='monitor-row-top'><div class='monitor-number'>"+String(w.h).padStart(2,"0")+"</div><div class='monitor-period'><b>"+String(w.h).padStart(2,"0")+":00 – "+String(w.h).padStart(2,"0")+":59</b><small>Min views: "+(w.minV||0).toLocaleString()+" · Min likes: "+(w.minL||0).toLocaleString()+" · "+arr.length+" snapshots</small></div><div class='monitor-status "+status+"'>"+label+"</div></div><button class='monitor-expand' aria-expanded='false'>↓</button><div class='monitor-result collapsed'><div class='monitor-snaps'>"+(resultBox+snapshotList)+"</div></div></div>";
-  }).reverse().join("");
- body.querySelectorAll('.monitor-expand').forEach(btn=>btn.onclick=()=>{const row=btn.closest('.monitor-row');const d=row?.querySelector('.monitor-result');if(!d)return;const o=d.classList.contains('collapsed');d.classList.toggle('collapsed',!o);d.classList.toggle('open',o);btn.textContent=o?'↑':'↓';btn.setAttribute('aria-expanded',String(o));});
+  const targets=hourlyTargets(r),snaps=history.slice().sort((a,b)=>new Date(a.captured_at)-new Date(b.captured_at));
+  const cairoParts=(ts)=>{const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",hour12:false}).formatToParts(new Date(ts));const o={};for(const p of parts)if(p.type!=="literal")o[p.type]=p.value;return o;};
+  const dayKey=(ts)=>{const p=cairoParts(ts);return p.year+"-"+p.month+"-"+p.day;};
+  const dayLabel=(key)=>{const d=new Date(key+"T12:00:00Z");return new Intl.DateTimeFormat("en-US",{timeZone:"Africa/Cairo",day:"numeric",month:"long",year:"numeric"}).format(d);};
+  const hourOf=(ts)=>Number(cairoParts(ts).hour);
+  const days={};for(const x of snaps){const k=dayKey(x.captured_at);(days[k]||(days[k]=[])).push(x);}
+  const dayKeys=Object.keys(days).sort((a,b)=>b.localeCompare(a));if(!dayKeys.length){body.innerHTML="<div class='empty'>No snapshot data yet.</div>";return;}
+  const todayKey=dayKey(Date.now());
+  const dayHtml=dayKeys.map((dateKey,dayIndex)=>{
+    const daySnaps=days[dateKey]||[],byHour={};for(const x of daySnaps){const h=hourOf(x.captured_at);(byHour[h]||(byHour[h]=[])).push(x);}
+    const hours=Array.from({length:24},(_,h)=>{
+      const t=targets[String(h)]||targets[String(h).padStart(2,"0")]||{},minV=Number(t.views||0),minL=Number(t.likes||0),arr=(byHour[h]||[]).slice().sort((a,b)=>new Date(a.captured_at)-new Date(b.captured_at));
+      const complete=dateKey!==todayKey||h<localHour(),hasTarget=minV>0||minL>0;let status=hasTarget?"nodata":"no-target",result="—";
+      if(arr.length>=2&&hasTarget&&complete){const first=arr[0],last=arr[arr.length-1],dv=Number(last.views||0)-Number(first.views||0),dl=Number(last.likes||0)-Number(first.likes||0),pass=(minV<=0||dv>=minV)&&(minL<=0||dl>=minL);status=pass?"pass":"fail";result=(dv>=0?"+":"")+dv.toLocaleString()+" views · "+(dl>=0?"+":"")+dl.toLocaleString()+" likes";}
+      else if(hasTarget&&dateKey===todayKey&&h===localHour())status="pending";
+      const label=status==="pass"?"PASS":status==="fail"?"NOT MET":status==="pending"?"IN PROGRESS":status==="nodata"?"NO DATA":"—";
+      const snapshotList=arr.length?arr.slice().reverse().map((snap,i,a)=>{const prev=a[i+1],dv=prev?Number(snap.views||0)-Number(prev.views||0):0,dl=prev?Number(snap.likes||0)-Number(prev.likes||0):0;return "<div class='monitor-snap'><span>"+esc(fmt(snap.captured_at))+"</span><b>"+Number(snap.views||0).toLocaleString()+" views</b><em class='"+(dv>0?"up":dv<0?"down":"neutral")+"'>"+(dv>=0?"+":"")+dv.toLocaleString()+"</em><b>"+Number(snap.likes||0).toLocaleString()+" likes</b><em class='"+(dl>0?"up":dl<0?"down":"neutral")+"'>"+(dl>=0?"+":"")+dl.toLocaleString()+"</em></div>";}).join(""):"<div class='monitor-snaps-empty'>No data yet for this hour.</div>";
+      const resultBox=arr.length&&hasTarget&&complete?"<div class='monitor-growth'><span>Actual growth</span><strong>"+result+"</strong></div>":"";
+      return "<div class='monitor-row'><div class='monitor-row-top'><div class='monitor-number'>"+String(h).padStart(2,"0")+"</div><div class='monitor-period'><b>"+String(h).padStart(2,"0")+":00 – "+String(h).padStart(2,"0")+":59</b><small>Min views: "+(minV||0).toLocaleString()+" · Min likes: "+(minL||0).toLocaleString()+" · "+arr.length+" snapshots</small></div><div class='monitor-status "+status+"'>"+label+"</div></div><button class='monitor-expand' aria-expanded='false'>↓</button><div class='monitor-result collapsed'><div class='monitor-snaps'>"+resultBox+snapshotList+"</div></div></div>";
+    }).join("");
+    const open=dayIndex===0;return "<div class='monitor-day'><button class='monitor-day-toggle' aria-expanded='"+open+"'><span>"+esc(dayLabel(dateKey))+"</span><b>"+daySnaps.length+" snapshots</b><i>"+(open?"↑":"↓")+"</i></button><div class='monitor-day-body "+(open?"":"collapsed")+"'>"+hours+"</div></div>";
+  }).join("");
+  body.innerHTML="<div class='monitor-summary'><span>Fixed clock hours · Cairo time</span><b>Each day has its own 00:00–23:59 timeline</b></div>"+dayHtml;
+  body.querySelectorAll(".monitor-day-toggle").forEach(btn=>btn.onclick=()=>{const d=btn.nextElementSibling,open=d.classList.contains("collapsed");d.classList.toggle("collapsed",!open);btn.setAttribute("aria-expanded",String(open));btn.querySelector("i").textContent=open?"↑":"↓";});
+  body.querySelectorAll(".monitor-expand").forEach(btn=>btn.onclick=()=>{const row=btn.closest(".monitor-row"),d=row?.querySelector(".monitor-result");if(!d)return;const open=d.classList.contains("collapsed");d.classList.toggle("collapsed",!open);d.classList.toggle("open",open);btn.textContent=open?"↑":"↓";btn.setAttribute("aria-expanded",String(open));});
  };
  const renderDrops=()=>{
   const snaps=history.slice().sort((a,b)=>new Date(a.captured_at)-new Date(b.captured_at)),drops=[];
