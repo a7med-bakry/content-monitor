@@ -165,7 +165,7 @@ async function loadAlertHistory(){
    const msg=drop?metric+" dropped from "+old.toLocaleString()+" to "+cur.toLocaleString():spike?metric+" jumped unexpectedly from "+old.toLocaleString()+" to "+cur.toLocaleString():"Views increased by "+(cur-old).toLocaleString()+" (required growth was not met).";
    const label=drop?"DROP":spike?"SPIKE":growth?"NOT MET":"ALERT";
    const cls=drop?"drop":spike?"spike":growth?"growth":"warning";
-   return "<div class='alert-item "+cls+"'><button class='alert-main' onclick='showDetails("+JSON.stringify(String(a.content_id))+")'><span class='alert-item-copy'><b>"+esc(a.title||"Clip")+"</b><span>"+esc(fmt(a.created_at))+" · "+label+"</span><small>"+esc(msg)+"</small></span></button><button class='alert-delete' title='Delete alert' aria-label='Delete alert' onclick='event.stopPropagation();deleteAlert("+Number(a.id)+")'>Delete</button></div>";
+   return "<div class='alert-item "+cls+"'><button class='alert-main' onclick='showDetails("+JSON.stringify(String(a.content_id))+")'><span class='alert-item-copy'><b class='alert-reel-title'>"+esc(a.title||"Clip")+"</b><span class='alert-message'>"+label+" · "+esc(msg)+"</span><small class='alert-time'>"+esc(fmt(a.created_at))+"</small></span></button><button class='alert-delete' title='Delete alert' aria-label='Delete alert' onclick='event.stopPropagation();deleteAlert("+Number(a.id)+")'>Delete</button></div>";
   }).join("");
  }catch{box.innerHTML="<div class='empty'>Could not load alerts.</div>";}
 }
