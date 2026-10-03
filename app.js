@@ -122,12 +122,41 @@ window.showMonitoring=showMonitoring;
 
 async function editMonitoring(id){
  const r=reelsData.find(x=>String(x.id)===String(id));if(!r)return;
- const body=document.createElement("div");body.className="edit-box hourly-editor";const targets=hourlyTargets(r);
- body.innerHTML="<button class='close' id='editClose'>×</button><h3>Hourly monitoring</h3><div class='apply-all-card'><b>Apply to all hours</b><small>Set one minimum for Views and Likes and apply it to every hour.</small><div class='apply-all-fields'><input id='allMinViews' type='number' min='0' placeholder='Min views'><input id='allMinLikes' type='number' min='0' placeholder='Min likes'><button class='secondary' id='applyAll' type='button'>Apply to all</button></div></div><p class='hint'>Each clock hour is fixed: 07:00–07:59, 08:00–08:59, etc. Enter the minimum views and likes required during that hour.</p><div class='hourly-head'><span>Hour</span><span>Min views</span><span>Min likes</span></div><div id='hourlyRows'></div><label class='toggle-row'><span><b>Drop monitoring</b><small>Alert immediately if views, likes, comments, shares or saves decrease.</small></span><input id='editDrops' type='checkbox'></label><label class='toggle-row'><span><b>Notifications</b><small>Turn alert generation and push notifications on or off.</small></span><input id='editNotifications' type='checkbox'></label><button class='primary' id='editSave'>Save changes</button>";
- document.body.appendChild(body);body.querySelector("#applyAll").onclick=()=>{const v=Number(body.querySelector("#allMinViews").value||0),l=Number(body.querySelector("#allMinLikes").value||0);body.querySelectorAll("#hourlyRows .hourly-row").forEach(x=>{x.querySelector("[data-kind=views]").value=v;x.querySelector("[data-kind=likes]").value=l;});};body.querySelector("#editDrops").checked=r.monitor_drops!==false;body.querySelector("#editNotifications").checked=r.notifications_enabled!==false;
- const rows=body.querySelector("#hourlyRows");rows.innerHTML=Array.from({length:24},(_,h)=>{const t=targets[String(h)]||targets[String(h).padStart(2,"0")]||{};return "<div class='hourly-row'><b>"+String(h).padStart(2,"0")+":00–"+String(h).padStart(2,"0")+":59</b><input data-hour='"+h+"' data-kind='views' type='number' min='0' value='"+Number(t.views||0)+"' placeholder='0'><input data-hour='"+h+"' data-kind='likes' type='number' min='0' value='"+Number(t.likes||0)+"' placeholder='0'></div>";}).join("");
- body.querySelector("#editClose").onclick=()=>body.remove();
- body.querySelector("#editSave").onclick=async()=>{const btn=body.querySelector("#editSave");btn.disabled=true;btn.textContent="Saving...";try{const ht={};rows.querySelectorAll(".hourly-row").forEach(row=>{const h=row.querySelector("[data-hour]").dataset.hour,v=Number(row.querySelector("[data-kind=views]").value||0),l=Number(row.querySelector("[data-kind=likes]").value||0);if(v>0||l>0)ht[String(Number(h))]={views:v,likes:l};});const q=await api("update",{content_id:id,hourly_targets:ht,monitor_drops:body.querySelector("#editDrops").checked,notifications_enabled:body.querySelector("#editNotifications").checked});const d=await q.json();if(!q.ok)throw new Error(d.error||"Server rejected the update");const i=reelsData.findIndex(x=>String(x.id)===String(id));if(i>=0)reelsData[i]={...reelsData[i],...(d.reel||{})};body.remove();render();showDetails(id);}catch(err){btn.disabled=false;btn.textContent="Save changes";alert("Could not save changes: "+(err.message||err));}};
+ const overlay=document.createElement("div");
+ overlay.className="edit-monitor-modal";
+ overlay.innerHTML="<div class='edit-monitor-sheet'><button class='close' id='editClose'>×</button><div class='modal-icon'>⚙</div><h2>Edit Monitoring</h2><p class='hint'>Set the minimum views and likes for each fixed clock hour.</p><div class='apply-all-card'><b>Apply to all hours</b><small>Set one minimum for Views and Likes and apply it to every hour.</small><div class='apply-all-fields'><input id='allMinViews' type='number' min='0' placeholder='Min views'><input id='allMinLikes' type='number' min='0' placeholder='Min likes'><button class='secondary' id='applyAll' type='button'>Apply to all</button></div></div><div class='hourly-head'><span>Hour</span><span>Min views</span><span>Min likes</span></div><div id='hourlyRows'></div><label class='toggle-row'><span><b>Drop monitoring</b><small>Alert immediately if views, likes, comments, shares or saves decrease.</small></span><input id='editDrops' type='checkbox'></label><label class='toggle-row'><span><b>Notifications</b><small>Turn alert generation and push notifications on or off.</small></span><input id='editNotifications' type='checkbox'></label><button class='primary' id='editSave'>Save changes</button></div>";
+ document.body.appendChild(overlay);
+ const sheet=overlay.querySelector(".edit-monitor-sheet"),targets=hourlyTargets(r),rows=overlay.querySelector("#hourlyRows");
+ overlay.querySelector("#editDrops").checked=r.monitor_drops!==false;
+ overlay.querySelector("#editNotifications").checked=r.notifications_enabled!==false;
+ rows.innerHTML=Array.from({length:24},(_,h)=>{
+  const t=targets[String(h)]||targets[String(h).padStart(2,"0")]||{};
+  return "<div class='hourly-row'><b>"+String(h).padStart(2,"0")+":00–"+String(h).padStart(2,"0")+":59</b><input data-hour='"+h+"' data-kind='views' type='number' min='0' value='"+Number(t.views||0)+"' placeholder='0'><input data-hour='"+h+"' data-kind='likes' type='number' min='0' value='"+Number(t.likes||0)+"' placeholder='0'></div>";
+ }).join("");
+ overlay.querySelector("#applyAll").onclick=()=>{
+  const v=Math.max(0,Number(overlay.querySelector("#allMinViews").value||0)),l=Math.max(0,Number(overlay.querySelector("#allMinLikes").value||0));
+  rows.querySelectorAll(".hourly-row").forEach(x=>{x.querySelector("[data-kind=views]").value=v;x.querySelector("[data-kind=likes]").value=l;});
+ };
+ const close=()=>overlay.remove();
+ overlay.querySelector("#editClose").onclick=close;
+ overlay.addEventListener("click",e=>{if(e.target===overlay)close();});
+ overlay.querySelector("#editSave").onclick=async()=>{
+  const btn=overlay.querySelector("#editSave");btn.disabled=true;btn.textContent="Saving...";
+  try{
+   const ht={};
+   rows.querySelectorAll(".hourly-row").forEach(row=>{
+    const h=row.querySelector("[data-hour]").dataset.hour,v=Number(row.querySelector("[data-kind=views]").value||0),l=Number(row.querySelector("[data-kind=likes]").value||0);
+    if(v>0||l>0)ht[String(Number(h))]={views:v,likes:l};
+   });
+   const q=await api("update",{content_id:id,hourly_targets:ht,monitor_drops:overlay.querySelector("#editDrops").checked,notifications_enabled:overlay.querySelector("#editNotifications").checked});
+   const d=await q.json();if(!q.ok)throw new Error(d.error||"Server rejected the update");
+   const i=reelsData.findIndex(x=>String(x.id)===String(id));if(i>=0)reelsData[i]={...reelsData[i],...(d.reel||{})};
+   close();render();
+   const detail=document.querySelector(".detail-modal");if(detail)detail.remove();
+   showDetails(id);
+  }catch(err){btn.disabled=false;btn.textContent="Save changes";alert("Could not save changes: "+(err.message||err));}
+ };
+ sheet.scrollTop=0;
 }
 async function toggleMonitoring(id,isActive){if(!confirm(isActive?"Stop monitoring this clip? Snapshots will pause, but its history will stay.":"Resume monitoring this clip?"))return;try{const q=await api("update",{content_id:id,active:!isActive});const d=await q.json();if(!q.ok)throw new Error(d.error||"Update failed");const i=reelsData.findIndex(x=>String(x.id)===String(id));if(i>=0)reelsData[i]={...reelsData[i],active:!isActive};document.querySelector(".detail-modal")?.remove();render();}catch(e){alert("Could not change monitoring: "+(e.message||e));}}
 async function toggleNotifications(id,isEnabled){try{const q=await api("update",{content_id:id,notifications_enabled:!isEnabled});const d=await q.json();if(!q.ok)throw new Error(d.error||"Update failed");const i=reelsData.findIndex(x=>String(x.id)===String(id));if(i>=0)reelsData[i]={...reelsData[i],...(d.reel||{})};document.querySelector(".detail-modal")?.remove();render();showDetails(id);}catch(e){alert("Could not change alerts: "+(e.message||e));}}
