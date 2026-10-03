@@ -99,6 +99,12 @@ window.contentMonitorNative.testNotification = async () => {
 };
 
 if (native) {
+  // Register FCM as soon as the app starts, not only after pressing Test Notification.
+  // This keeps the device token registered so FCM can wake the app while it is fully closed.
+  setupNativeNotifications(false).catch(e => console.error("Background push registration failed", e));
+  document.addEventListener("resume", () => {
+    setupNativeNotifications(false).catch(e => console.error("Push re-registration failed", e));
+  });
   window.Notification = class NativeNotification {
     static permission = localStorage.getItem("nativeNotificationsEnabled") === "1" ? "granted" : "default";
     static async requestPermission() {
