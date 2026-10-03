@@ -6,7 +6,17 @@ let reelsData=[];
 let lastAlertId=Number(localStorage.getItem("lastAlertId")||0);
 const reels=document.querySelector("#reels"),modal=document.querySelector("#modal"),settingsModal=document.querySelector("#settingsModal");
 
-function api(action,body={}){return fetch(API,{method:"POST",headers:{"Content-Type":"text/plain"},body:JSON.stringify({action,...body})});}
+function api(action,body={}){
+ return fetch(API,{
+  method:"POST",
+  headers:{
+   "Content-Type":"application/json",
+   "apikey":SUPABASE_KEY,
+   "Authorization":"Bearer "+SUPABASE_KEY
+  },
+  body:JSON.stringify({action,...body})
+ });
+}
 function fmt(ts){if(!ts)return "—";return new Date(ts).toLocaleString([], {day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});}
 function localInput(ts){const d=new Date(ts),p=n=>String(n).padStart(2,"0");return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+"T"+p(d.getHours())+":"+p(d.getMinutes());}
 function esc(v){return String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
@@ -124,7 +134,7 @@ async function editMonitoring(id){
  const r=reelsData.find(x=>String(x.id)===String(id));if(!r)return;
  const overlay=document.createElement("div");
  overlay.className="edit-monitor-modal";
- overlay.innerHTML="<div class='edit-monitor-sheet'><button class='close' id='editClose'>×</button><div class='modal-icon'>⚙</div><h2>Edit Monitoring</h2><p class='hint'>Set the minimum views and likes for each fixed clock hour.</p><div class='apply-all-card'><b>Apply to all hours</b><small>Set one minimum for Views and Likes and apply it to every hour.</small><div class='apply-all-fields'><input id='allMinViews' type='number' min='0' placeholder='Min views'><input id='allMinLikes' type='number' min='0' placeholder='Min likes'><button class='secondary' id='applyAll' type='button'>Apply to all</button></div></div><div class='hourly-head'><span>Hour</span><span>Min views</span><span>Min likes</span></div><div id='hourlyRows'></div><label class='toggle-row'><span><b>Drop monitoring</b><small>Alert immediately if views, likes, comments, shares or saves decrease.</small></span><input id='editDrops' type='checkbox'></label><label class='toggle-row'><span><b>Notifications</b><small>Turn alert generation and push notifications on or off.</small></span><input id='editNotifications' type='checkbox'></label><button class='primary' id='editSave'>Save changes</button></div>";
+ overlay.innerHTML="<div class='edit-monitor-sheet'><button class='close' id='editClose'>×</button><div class='modal-icon'>⚙</div><h2>Edit Monitoring</h2><p class='hint'>Set the minimum views and likes for each fixed clock hour.</p><div class='apply-all-card'><b>Apply to all hours</b><small>Set one minimum for Views and Likes and apply it to every hour.</small><div class='apply-all-fields'><input id='allMinViews' type='number' min='0' placeholder='Min views'><input id='allMinLikes' type='number' min='0' placeholder='Min likes'><button class='secondary' id='applyAll' type='button'>Apply to all</button></div></div><div class='hourly-head'><span>Hour</span><span>Min views</span><span>Min likes</span></div><div id='hourlyRows'></div><label class='toggle-row'><span><b>Drop monitoring</b><small>Alert immediately if views, likes, comments, shares or saves decrease.</small></span><input id='editDrops' type='checkbox'></label><label class='toggle-row'><span><b>Notifications</b><small>Turn alert generation and push notifications on or off.</small></span><input id='editNotifications' type='checkbox'></label><button class='primary' id='editSave' type='button'>Save changes</button></div>";
  document.body.appendChild(overlay);
  const sheet=overlay.querySelector(".edit-monitor-sheet"),targets=hourlyTargets(r),rows=overlay.querySelector("#hourlyRows");
  overlay.querySelector("#editDrops").checked=r.monitor_drops!==false;
@@ -149,12 +159,19 @@ async function editMonitoring(id){
     if(v>0||l>0)ht[String(Number(h))]={views:v,likes:l};
    });
    const q=await api("update",{content_id:id,hourly_targets:ht,monitor_drops:overlay.querySelector("#editDrops").checked,notifications_enabled:overlay.querySelector("#editNotifications").checked});
-   const d=await q.json();if(!q.ok)throw new Error(d.error||"Server rejected the update");
+   const raw=await q.text();
+   let d={};try{d=raw?JSON.parse(raw):{};}catch{throw new Error("Invalid server response");}
+   if(!q.ok)throw new Error(d.error||("Server rejected the update ("+q.status+")"));
    const i=reelsData.findIndex(x=>String(x.id)===String(id));if(i>=0)reelsData[i]={...reelsData[i],...(d.reel||{})};
    close();render();
    const detail=document.querySelector(".detail-modal");if(detail)detail.remove();
    showDetails(id);
-  }catch(err){btn.disabled=false;btn.textContent="Save changes";alert("Could not save changes: "+(err.message||err));}
+  }catch(err){
+   btn.disabled=false;btn.textContent="Save changes";
+   const oldErr=overlay.querySelector(".edit-save-error");if(oldErr)oldErr.remove();
+   const e=document.createElement("div");e.className="edit-save-error";e.textContent="Could not save changes: "+(err.message||err);
+   btn.insertAdjacentElement("beforebegin",e);
+ }
  };
  sheet.scrollTop=0;
 }
