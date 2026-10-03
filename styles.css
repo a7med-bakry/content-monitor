@@ -161,3 +161,30 @@
     grid-template-columns:minmax(76px,1.15fr) minmax(62px,1fr) minmax(62px,1fr)
   }
 }
+
+/* Stable Add Reel + Edit Monitoring modals */
+.add-reel-sheet{display:flex;flex-direction:column;max-height:94vh;overflow-y:auto}
+.add-reel-sheet .settings-card{width:100%;flex:0 0 auto}
+.add-reel-sheet .fixed-snapshot{width:100%;flex:0 0 auto}
+.edit-monitor-modal{
+  position:fixed;inset:0;z-index:500;
+  display:flex;align-items:flex-end;justify-content:center;
+  padding:12px;background:#03050ad9;backdrop-filter:blur(12px)
+}
+.edit-monitor-sheet{
+  width:min(620px,100%);max-height:94vh;overflow-y:auto;
+  background:linear-gradient(155deg,#151b24,#0c1016);
+  border:1px solid #2a3340;border-radius:28px;
+  padding:22px;box-shadow:0 35px 100px #000d;position:relative
+}
+.edit-monitor-sheet .hourly-head,.edit-monitor-sheet .hourly-row{
+  grid-template-columns:minmax(100px,1.35fr) minmax(90px,1fr) minmax(90px,1fr)
+}
+.edit-monitor-sheet .hourly-row input{width:100%;min-width:0}
+@media(max-width:600px){
+ .edit-monitor-modal{padding:8px}
+ .edit-monitor-sheet{width:100%;max-height:96dvh;padding:20px 14px 18px;border-radius:24px 24px 0 0}
+ .edit-monitor-sheet .hourly-head,.edit-monitor-sheet .hourly-row{
+   grid-template-columns:minmax(76px,1.15fr) minmax(62px,1fr) minmax(62px,1fr);gap:6px
+ }
+}
