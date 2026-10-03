@@ -50,3 +50,70 @@
 .summary>div{cursor:pointer;transition:.18s ease}.summary>div:hover{transform:translateY(-1px)}.summary>div.selected{outline:1px solid #4d596b;box-shadow:0 0 0 2px #4d596b22 inset}.summary>div.selected strong{transform:scale(1.03)}
 
 .alert-reel-title{display:block;font-size:13px!important;line-height:1.3;margin-bottom:6px}.alert-message{display:block;font-size:11px;line-height:1.45;color:#c2c9d4}.alert-time{display:block;margin-top:8px;padding-top:7px;border-top:1px solid #242b35;font-size:9px!important;color:#737e90!important;line-height:1.3}
+
+
+/* Add Reel mobile layout fix */
+#modal{width:100vw;max-width:100vw;overflow:hidden;padding:12px}
+#modal .sheet{
+  width:min(600px,calc(100vw - 24px));
+  max-width:calc(100vw - 24px);
+  min-width:0;
+  overflow-x:hidden
+}
+#modal .settings-card,
+#modal .apply-all-card,
+#modal #addHourlyRows,
+#modal .hourly-head,
+#modal .hourly-row{
+  width:100%;
+  min-width:0;
+  max-width:100%
+}
+#modal .settings-title,
+#modal .settings-subtitle,
+#modal .apply-all-card b,
+#modal .apply-all-card small{
+  white-space:normal;
+  word-break:normal;
+  overflow-wrap:break-word
+}
+#modal .apply-all-card small{display:block;margin-top:5px;line-height:1.45;color:#7d8797}
+#modal .apply-all-fields>*{min-width:0}
+#modal .hourly-head,
+#modal .hourly-row{
+  grid-template-columns:minmax(88px,1.25fr) minmax(70px,1fr) minmax(70px,1fr)
+}
+#modal .hourly-row input{width:100%;min-width:0}
+
+@media(max-width:600px){
+  #modal{padding:8px;align-items:flex-end}
+  #modal .sheet{
+    width:calc(100vw - 16px);
+    max-width:calc(100vw - 16px);
+    max-height:96dvh;
+    padding:20px 14px 18px;
+    border-radius:24px 24px 0 0
+  }
+  #modal .settings-card{padding:13px 10px;margin-top:14px}
+  #modal .apply-all-card{padding:12px 10px}
+  #modal .apply-all-fields{
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+    gap:7px
+  }
+  #modal .apply-all-fields button{
+    grid-column:1/-1;
+    width:100%
+  }
+  #modal .hourly-head,
+  #modal .hourly-row{
+    grid-template-columns:minmax(78px,1.15fr) minmax(64px,1fr) minmax(64px,1fr);
+    gap:6px
+  }
+  #modal .hourly-head{padding:8px 4px;font-size:9px}
+  #modal .hourly-row{padding:7px 4px}
+  #modal .hourly-row b{font-size:10px;line-height:1.25}
+  #modal .hourly-row input{padding:7px 6px;font-size:12px}
+  #modal .toggle-row{align-items:flex-start}
+  #modal .fixed-snapshot{width:100%;margin-top:12px}
+  #modal #saveBtn{width:100%}
+}
