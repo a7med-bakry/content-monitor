@@ -229,13 +229,30 @@ if(test)test.onclick=async()=>{
     test.textContent=oldText;
   }
 };
-document.querySelector("#enableNotifications").onclick=()=>setupNotifications();document.querySelector("#addApplyAll")?.addEventListener("click",()=>{const v=Math.max(0,Number(document.querySelector("#addAllMinViews")?.value||0)),l=Math.max(0,Number(document.querySelector("#addAllMinLikes")?.value||0));document.querySelectorAll("#addHourlyRows .hourly-row").forEach(row=>{row.querySelector("[data-kind=views]").value=v;row.querySelector("[data-kind=likes]").value=l;});});document.querySelector("#addApplyAll")?.addEventListener("click",()=>{const v=Math.max(0,Number(document.querySelector("#addAllMinViews")?.value||0)),l=Math.max(0,Number(document.querySelector("#addAllMinLikes")?.value||0));document.querySelectorAll("#addHourlyRows .hourly-row").forEach(row=>{row.querySelector("[data-kind=views]").value=v;row.querySelector("[data-kind=likes]").value=l;});});
-document.querySelector("#url").addEventListener("input",()=>{const p=detectPlatform(document.querySelector("#url").value),el=document.querySelector("#platformDetected");el.classList.toggle("hidden",!p);el.textContent=p==="tiktok"?"✓ TikTok detected":"✓ Instagram detected";});
-const minuteOptions=Array.from({length:59},(_,i)=>"<option value='"+i+"'>"+i+"</option>").join("");
-document.querySelector("#alertStartMinute").innerHTML=minuteOptions;
-document.querySelector("#alertEndMinute").innerHTML=Array.from({length:59},(_,i)=>"<option value='"+(i+1)+"'>"+(i+1)+"</option>").join("");
-document.querySelector("#alertStartMinute").onchange=updateRulePreview;
-document.querySelector("#alertEndMinute").onchange=updateRulePreview;
+document.querySelector("#enableNotifications").onclick=()=>setupNotifications();
+document.querySelector("#addApplyAll")?.addEventListener("click",()=>{
+  const v=Math.max(0,Number(document.querySelector("#addAllMinViews")?.value||0));
+  const l=Math.max(0,Number(document.querySelector("#addAllMinLikes")?.value||0));
+  document.querySelectorAll("#addHourlyRows .hourly-row").forEach(row=>{
+    row.querySelector("[data-kind=views]").value=v;
+    row.querySelector("[data-kind=likes]").value=l;
+});
+});
+document.querySelector("#url").addEventListener("input",()=>{
+  const p=detectPlatform(document.querySelector("#url").value),el=document.querySelector("#platformDetected");
+  el.classList.toggle("hidden",!p);
+  el.textContent=p==="tiktok"?"✓ TikTok detected":"✓ Instagram detected";
+});
 
-document.querySelector("#minViews").oninput=updateRulePreview;document.querySelector("#alertRepeatMinutes").oninput=updateRulePreview;
-loadReels().then(()=>openClipRoute());loadAlertHistory();checkAlerts();setInterval(()=>{checkAlerts();},15000);setInterval(()=>{loadReels();},60000);
+/* Startup: load the dashboard and alert badge immediately on every open. */
+async function startup(){
+  await Promise.all([
+    loadReels(),
+    loadAlertHistory()
+  ]);
+  await checkAlerts();
+  await openClipRoute();
+}
+startup();
+setInterval(()=>{checkAlerts();},15000);
+setInterval(()=>{loadReels();loadAlertHistory();},60000);
