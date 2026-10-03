@@ -70,6 +70,34 @@ jobs:
           npx cap add android
           cp /tmp/google-services.json android/app/google-services.json
 
+      - name: Create native notification channel before FCM can receive
+        run: |
+          mkdir -p android/app/src/main/java/com/contentmonitor/app
+          cat > android/app/src/main/java/com/contentmonitor/app/ContentMonitorApplication.java <<'JAVA'
+          package com.contentmonitor.app;
+
+          import android.app.Application;
+          import android.app.NotificationChannel;
+          import android.app.NotificationManager;
+          import android.os.Build;
+
+          public class ContentMonitorApplication extends Application {
+              public static final String CHANNEL_ID = "content_monitor_alerts";
+              @Override
+              public void onCreate() {
+                  super.onCreate();
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                      NotificationManager nm = getSystemService(NotificationManager.class);
+                      NotificationChannel channel = new NotificationChannel(CHANNEL_ID, "Content Monitor alerts", NotificationManager.IMPORTANCE_HIGH);
+                      channel.setDescription("Monitoring alerts");
+                      channel.setSound(android.provider.Settings.System.DEFAULT_NOTIFICATION_URI, null);
+                      channel.enableVibration(true);
+                      nm.createNotificationChannel(channel);
+                  }
+              }
+          }
+          JAVA
+
       - name: Set FCM default notification channel
         run: |
           python3 - <<'PY'
@@ -81,6 +109,12 @@ jobs:
               pos=s.rfind('</application>')
               if pos<0: raise SystemExit('application tag not found')
               s=s[:pos]+"        "+meta+"\n    "+s[pos:]
+          if 'android:name="com.contentmonitor.app.ContentMonitorApplication"' not in s:
+              pos=s.find('<application')
+              if pos<0: raise SystemExit('application tag not found')
+              end=s.find('>',pos)
+              if end<0: raise SystemExit('application opening tag not found')
+              s=s[:pos]+s[pos:end]+' android:name="com.contentmonitor.app.ContentMonitorApplication"'+s[end:]
           if 'android.permission.POST_NOTIFICATIONS' not in s:
               pos=s.find('<application')
               if pos<0: raise SystemExit('application tag not found')
