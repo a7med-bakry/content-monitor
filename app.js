@@ -114,24 +114,43 @@ async function showMonitoring(id){
   const dayKey=(ts)=>{const p=cairoParts(ts);return p.year+"-"+p.month+"-"+p.day;};
   const dayLabel=(key)=>{const d=new Date(key+"T12:00:00Z");return new Intl.DateTimeFormat("en-US",{timeZone:"Africa/Cairo",day:"numeric",month:"long",year:"numeric"}).format(d);};
   const hourOf=(ts)=>Number(cairoParts(ts).hour);
-  const days={};for(const x of snaps){const k=dayKey(x.captured_at);(days[k]||(days[k]=[])).push(x);}
+
+  // Every snapshot belongs to exactly one clock-hour chain.
+  // For snapshot N, its delta covers previous_snapshot -> snapshot_N, so assign
+  // it by the midpoint of that interval. This keeps boundary snapshots from
+  // disappearing: 19:50->20:00 belongs to hour 19; 19:55->20:05 belongs to hour 20.
+  const entries=snaps.map((snap,i)=>{
+    const prev=i>0?snaps[i-1]:null;
+    const at=new Date(snap.captured_at).getTime();
+    const pt=prev?new Date(prev.captured_at).getTime():NaN;
+    const assignedMs=prev&&Number.isFinite(pt)&&Number.isFinite(at)&&at>pt ? pt+(at-pt)/2 : at;
+    return {
+      snap,prev,assigned_at:new Date(assignedMs).toISOString(),
+      dv:prev?Number(snap.views||0)-Number(prev.views||0):0,
+      dl:prev?Number(snap.likes||0)-Number(prev.likes||0):0
+    };
+  });
+
+  const days={};for(const e of entries){const k=dayKey(e.assigned_at);(days[k]||(days[k]=[])).push(e);}
   const dayKeys=Object.keys(days).sort((a,b)=>b.localeCompare(a));if(!dayKeys.length){body.innerHTML="<div class='empty'>No snapshot data yet.</div>";return;}
   const todayKey=dayKey(Date.now());
   const dayHtml=dayKeys.map((dateKey,dayIndex)=>{
-    const daySnaps=days[dateKey]||[],byHour={};for(const x of daySnaps){const h=hourOf(x.captured_at);(byHour[h]||(byHour[h]=[])).push(x);}
+    const dayEntries=days[dateKey]||[],byHour={};for(const e of dayEntries){const h=hourOf(e.assigned_at);(byHour[h]||(byHour[h]=[])).push(e);}
     const hours=Array.from({length:24},(_,h)=>{
-      const t=targets[String(h)]||targets[String(h).padStart(2,"0")]||{},minV=Number(t.views||0),minL=Number(t.likes||0),arr=(byHour[h]||[]).slice().sort((a,b)=>new Date(a.captured_at)-new Date(b.captured_at));
+      const t=targets[String(h)]||targets[String(h).padStart(2,"0")]||{},minV=Number(t.views||0),minL=Number(t.likes||0),arr=(byHour[h]||[]).slice().sort((a,b)=>new Date(a.assigned_at)-new Date(b.assigned_at));
       const complete=dateKey!==todayKey||h<localHour(),hasTarget=minV>0||minL>0;let status=hasTarget?"nodata":"no-target",result="—";
-      if(arr.length>=2&&hasTarget&&complete){const first=arr[0],last=arr[arr.length-1],dv=Number(last.views||0)-Number(first.views||0),dl=Number(last.likes||0)-Number(first.likes||0),pass=(minV<=0||dv>=minV)&&(minL<=0||dl>=minL);status=pass?"pass":"fail";result=(dv>=0?"+":"")+dv.toLocaleString()+" views · "+(dl>=0?"+":"")+dl.toLocaleString()+" likes";}
+      const growthRows=arr.filter(e=>e.prev);
+      const dv=growthRows.reduce((n,e)=>n+Number(e.dv||0),0),dl=growthRows.reduce((n,e)=>n+Number(e.dl||0),0);
+      if(growthRows.length&&hasTarget&&complete){const pass=(minV<=0||dv>=minV)&&(minL<=0||dl>=minL);status=pass?"pass":"fail";result=(dv>=0?"+":"")+dv.toLocaleString()+" views · "+(dl>=0?"+":"")+dl.toLocaleString()+" likes";}
       else if(hasTarget&&dateKey===todayKey&&h===localHour())status="pending";
       const label=status==="pass"?"PASS":status==="fail"?"NOT MET":status==="pending"?"IN PROGRESS":status==="nodata"?"NO DATA":"—";
-      const snapshotList=arr.length?arr.slice().reverse().map((snap,i,a)=>{const prev=a[i+1],dv=prev?Number(snap.views||0)-Number(prev.views||0):0,dl=prev?Number(snap.likes||0)-Number(prev.likes||0):0;return "<div class='monitor-snap'><span>"+esc(fmt(snap.captured_at))+"</span><b>"+Number(snap.views||0).toLocaleString()+" views</b><em class='"+(dv>0?"up":dv<0?"down":"neutral")+"'>"+(dv>=0?"+":"")+dv.toLocaleString()+"</em><b>"+Number(snap.likes||0).toLocaleString()+" likes</b><em class='"+(dl>0?"up":dl<0?"down":"neutral")+"'>"+(dl>=0?"+":"")+dl.toLocaleString()+"</em></div>";}).join(""):"<div class='monitor-snaps-empty'>No data yet for this hour.</div>";
-      const resultBox=arr.length&&hasTarget&&complete?"<div class='monitor-growth'><span>Actual growth</span><strong>"+result+"</strong></div>":"";
+      const snapshotList=arr.length?arr.slice().reverse().map(e=>{const snap=e.snap,dv=Number(e.dv||0),dl=Number(e.dl||0);return "<div class='monitor-snap'><span>"+esc(fmt(snap.captured_at))+"</span><b>"+Number(snap.views||0).toLocaleString()+" views</b><em class='"+(dv>0?"up":dv<0?"down":"neutral")+"'>"+(dv>=0?"+":"")+dv.toLocaleString()+"</em><b>"+Number(snap.likes||0).toLocaleString()+" likes</b><em class='"+(dl>0?"up":dl<0?"down":"neutral")+"'>"+(dl>=0?"+":"")+dl.toLocaleString()+"</em></div>";}).join(""):"<div class='monitor-snaps-empty'>No data yet for this hour.</div>";
+      const resultBox=growthRows.length&&hasTarget&&complete?"<div class='monitor-growth'><span>Actual growth</span><strong>"+result+"</strong></div>":"";
       return "<div class='monitor-row'><div class='monitor-row-top'><div class='monitor-number'>"+String(h).padStart(2,"0")+"</div><div class='monitor-period'><b>"+String(h).padStart(2,"0")+":00 – "+String(h).padStart(2,"0")+":59</b><small>Min views: "+(minV||0).toLocaleString()+" · Min likes: "+(minL||0).toLocaleString()+" · "+arr.length+" snapshots</small></div><div class='monitor-status "+status+"'>"+label+"</div></div><button class='monitor-expand' aria-expanded='false'>↓</button><div class='monitor-result collapsed'><div class='monitor-snaps'>"+resultBox+snapshotList+"</div></div></div>";
     }).join("");
-    const open=dayIndex===0;return "<div class='monitor-day'><button class='monitor-day-toggle' aria-expanded='"+open+"'><span>"+esc(dayLabel(dateKey))+"</span><b>"+daySnaps.length+" snapshots</b><i>"+(open?"↑":"↓")+"</i></button><div class='monitor-day-body "+(open?"":"collapsed")+"'>"+hours+"</div></div>";
+    const open=dayIndex===0;return "<div class='monitor-day'><button class='monitor-day-toggle' aria-expanded='"+open+"'><span>"+esc(dayLabel(dateKey))+"</span><b>"+dayEntries.length+" snapshots</b><i>"+(open?"↑":"↓")+"</i></button><div class='monitor-day-body "+(open?"":"collapsed")+"'>"+hours+"</div></div>";
   }).join("");
-  body.innerHTML="<div class='monitor-summary'><span>Fixed clock hours · Cairo time</span><b>Each day has its own 00:00–23:59 timeline</b></div>"+dayHtml;
+  body.innerHTML="<div class='monitor-summary'><span>Fixed clock hours · Cairo time</span><b>Boundary snapshots are assigned by interval midpoint so no snapshot is lost</b></div>"+dayHtml;
   body.querySelectorAll(".monitor-day-toggle").forEach(btn=>btn.onclick=()=>{const d=btn.nextElementSibling,open=d.classList.contains("collapsed");d.classList.toggle("collapsed",!open);btn.setAttribute("aria-expanded",String(open));btn.querySelector("i").textContent=open?"↑":"↓";});
   body.querySelectorAll(".monitor-expand").forEach(btn=>btn.onclick=()=>{const row=btn.closest(".monitor-row"),d=row?.querySelector(".monitor-result");if(!d)return;const open=d.classList.contains("collapsed");d.classList.toggle("collapsed",!open);d.classList.toggle("open",open);btn.textContent=open?"↑":"↓";btn.setAttribute("aria-expanded",String(open));});
  };
