@@ -119,7 +119,7 @@ async function processTask(task) {
   let browser;
   const clickLog = [];
   try {
-    browser = await chromium.launch({ headless: true });
+    browser = await chromium.launch({ headless: false });
     const context = await browser.newContext({ viewport: VIEWPORT });
     const page = await context.newPage();
 
