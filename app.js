@@ -384,7 +384,11 @@ async function renderClickTasks(){
   });
  }catch(e){el.innerHTML='<div class="empty">Could not load Supabase tasks.<br><br>'+esc(e.message||e)+'</div>';}
 }
-document.querySelectorAll(".click-choice").forEach(b=>b.addEventListener("click",()=>{selectedClickNumber=Number(b.dataset.click);document.querySelectorAll(".click-choice").forEach(x=>x.classList.toggle("active",x===b));}));
+const CLICK_POSITIONS={1:{x:804,y:527},2:{x:1029,y:59},3:{x:1072,y:519}};
+const clickXInput=document.querySelector("#clickX"),clickYInput=document.querySelector("#clickY");
+function applyClickPosition(){const p=CLICK_POSITIONS[selectedClickNumber];if(clickXInput)clickXInput.value=p.x;if(clickYInput)clickYInput.value=p.y;}
+document.querySelectorAll(".click-choice").forEach(b=>b.addEventListener("click",()=>{selectedClickNumber=Number(b.dataset.click);document.querySelectorAll(".click-choice").forEach(x=>x.classList.toggle("active",x===b));applyClickPosition();}));
+applyClickPosition();
 document.querySelector("#clickReelSelect")?.addEventListener("change",e=>{if(e.target.value)document.querySelector("#clickReelUrl").value=e.target.value;});
 document.querySelector("#saveClickTask")?.addEventListener("click",async()=>{
  const selected=document.querySelector("#clickReelSelect");
@@ -393,13 +397,13 @@ document.querySelector("#saveClickTask")?.addEventListener("click",async()=>{
  if(!url){alert("Choose a monitored Reel or enter a URL.");return}
  let parsedUrl;try{parsedUrl=new URL(url)}catch{alert("Enter a valid URL.");return}
  if(parsedUrl.protocol!=="https:"){alert("Only HTTPS URLs are accepted.");return}
- if(!Number.isInteger(clickX)||clickX<0||clickX>1919||!Number.isInteger(clickY)||clickY<0||clickY>1079){alert("Enter whole-number viewport coordinates: X 0–1919 and Y 0–1079.");return}
+ if(!Number.isInteger(clickX)||clickX<0||clickX>1919||!Number.isInteger(clickY)||clickY<0||clickY>1079){alert("The selected profile has fixed coordinates. Choose Click 1, 2, or 3 to load its saved position.");return}
  if(!Number.isInteger(sessions)||sessions<1||sessions>1000){alert("Sessions must be a whole number from 1 to 1000.");return}
  if(!Number.isInteger(interval)||interval<1||interval>1440){alert("Interval must be a whole number from 1 to 1440 minutes.");return}
  const reel=reelsData.find(r=>(r.url||"")===url);
  const btn=document.querySelector("#saveClickTask");btn.disabled=true;btn.textContent="Sending to Supabase...";
  try{
-  const response=await api("click_task_add",{label:reel?.title||"Playwright click test",target_url:url,click_profile:"click_"+selectedClickNumber,click_x:clickX,click_y:clickY,repetitions:sessions,interval_minutes:interval});
+  const response=await api("click_task_add",{label:reel?.title||"Playwright click test",target_url:url,click_profile:"click_"+selectedClickNumber,click_x:CLICK_POSITIONS[selectedClickNumber].x,click_y:CLICK_POSITIONS[selectedClickNumber].y,repetitions:sessions,interval_minutes:interval});
   const data=await response.json();if(!response.ok)throw new Error(data.error||"Could not save task");
   document.querySelector("#clickReelUrl").value="";
   await renderClickTasks();
