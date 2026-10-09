@@ -374,8 +374,8 @@ async function renderClickTasks(){
   clickTasksData=Array.isArray(data)?data:[];
   if(!clickTasksData.length){el.innerHTML='<div class="empty">No tasks in Supabase yet.</div>';return;}
   el.innerHTML=clickTasksData.map(t=>{
-   const status=t.status==="succeeded"?"Received · clicks disabled":t.status==="running"?"Worker received":t.status==="failed"?"Failed":t.status==="cancelled"?"Cancelled":"Queued";
-   return '<article class="click-task"><div class="click-task-top"><b>'+esc(t.click_profile||"Connection test")+'</b><span class="click-task-state">'+esc(status)+'</span></div><div class="click-task-reel">'+esc(t.label||t.target_url||"Playwright task")+'</div><div class="click-task-meta"><span>'+Number(t.repetitions||1)+' run(s)</span><span>Every '+Number(t.interval_minutes||1)+' min</span></div>'+(t.error_message?'<div class="click-task-meta">'+esc(t.error_message)+'</div>':'')+(t.status==="queued"?'<button class="secondary click-delete" type="button" data-delete-task="'+esc(t.id)+'">Delete task</button>':'')+'</article>';
+   const status=t.status==="succeeded"?"Succeeded":t.status==="running"?"Running":t.status==="failed"?"Failed":t.status==="cancelled"?"Cancelled":"Queued";
+   return '<article class="click-task"><div class="click-task-top"><b>'+esc(t.click_profile||"Connection test")+'</b><span class="click-task-state">'+esc(status)+'</span></div><div class="click-task-reel">'+esc(t.label||t.target_url||"Playwright task")+'</div><div class="click-task-meta"><span>Coordinates: X '+(Number.isFinite(Number(t.click_x))?Number(t.click_x):"—")+', Y '+(Number.isFinite(Number(t.click_y))?Number(t.click_y):"—")+'</span></div><div class="click-task-meta"><span>'+Number(t.repetitions||1)+' run(s)</span><span>Every '+Number(t.interval_minutes||1)+' min</span></div>'+(t.target_url?'<div class="click-task-meta">'+esc(t.target_url)+'</div>':'')+(t.result&&t.result.note?'<div class="click-task-meta">'+esc(t.result.note)+'</div>':'')+(t.error_message?'<div class="click-task-meta">'+esc(t.error_message)+'</div>':'')+(t.status==="queued"?'<button class="secondary click-delete" type="button" data-delete-task="'+esc(t.id)+'">Delete task</button>':'')+'</article>';
   }).join("");
   el.querySelectorAll("[data-delete-task]").forEach(b=>b.onclick=async()=>{
    if(!confirm("Delete this queued task?"))return;
@@ -389,20 +389,21 @@ document.querySelector("#clickReelSelect")?.addEventListener("change",e=>{if(e.t
 document.querySelector("#saveClickTask")?.addEventListener("click",async()=>{
  const selected=document.querySelector("#clickReelSelect");
  const url=(document.querySelector("#clickReelUrl").value||selected.value||"").trim();
- const sessions=Number(document.querySelector("#clickSessions").value),interval=Number(document.querySelector("#clickInterval").value);
+ const sessions=Number(document.querySelector("#clickSessions").value),interval=Number(document.querySelector("#clickInterval").value),clickX=Number(document.querySelector("#clickX").value),clickY=Number(document.querySelector("#clickY").value);
  if(!url){alert("Choose a monitored Reel or enter a URL.");return}
- if(!/^https:\/\//i.test(url)){alert("Enter a valid HTTPS URL.");return}
- if(!["instagram.com","www.instagram.com","m.instagram.com","tiktok.com","www.tiktok.com","vm.tiktok.com","vt.tiktok.com"].some(host=>{try{return new URL(url).hostname.toLowerCase()===host}catch{return false}})){alert("Only an Instagram or TikTok URL is allowed in this task queue.");return}
+ let parsedUrl;try{parsedUrl=new URL(url)}catch{alert("Enter a valid URL.");return}
+ if(parsedUrl.protocol!=="https:"){alert("Only HTTPS URLs are accepted.");return}
+ if(!Number.isInteger(clickX)||clickX<0||clickX>10000||!Number.isInteger(clickY)||clickY<0||clickY>10000){alert("Enter whole-number X and Y coordinates from 0 to 10000.");return}
  if(!Number.isInteger(sessions)||sessions<1||sessions>1000){alert("Sessions must be a whole number from 1 to 1000.");return}
  if(!Number.isInteger(interval)||interval<1||interval>1440){alert("Interval must be a whole number from 1 to 1440 minutes.");return}
  const reel=reelsData.find(r=>(r.url||"")===url);
  const btn=document.querySelector("#saveClickTask");btn.disabled=true;btn.textContent="Sending to Supabase...";
  try{
-  const response=await api("click_task_add",{label:reel?.title||"Playwright UI test",target_url:url,click_profile:"click_"+selectedClickNumber,repetitions:sessions,interval_minutes:interval});
+  const response=await api("click_task_add",{label:reel?.title||"Playwright click test",target_url:url,click_profile:"click_"+selectedClickNumber,click_x:clickX,click_y:clickY,repetitions:sessions,interval_minutes:interval});
   const data=await response.json();if(!response.ok)throw new Error(data.error||"Could not save task");
   document.querySelector("#clickReelUrl").value="";
   await renderClickTasks();
-  alert("Task sent to Supabase. The local worker can confirm receipt; browser clicks remain disabled.");
+  alert("Task sent to Supabase. The local worker will open the HTTPS URL and click the selected coordinates.");
  }catch(e){alert(e.message||e);}
  finally{btn.disabled=false;btn.textContent="Send task";}
 });
