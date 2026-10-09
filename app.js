@@ -358,34 +358,52 @@ setInterval(()=>{loadReels();loadAlertHistory();},60000);
 
 // Click-task planner: saves test configuration locally; it does not execute browser actions.
 let selectedClickNumber=1;
-const CLICK_TASKS_KEY="contentMonitorClickTasksV1";
-function getClickTasks(){try{return JSON.parse(localStorage.getItem(CLICK_TASKS_KEY)||"[]")}catch{return []}}
-function saveClickTasks(tasks){localStorage.setItem(CLICK_TASKS_KEY,JSON.stringify(tasks))}
+let clickTasksData=[];
 function populateClickReels(){
  const sel=document.querySelector("#clickReelSelect");if(!sel)return;
  const old=sel.value;
  sel.innerHTML='<option value="">Choose a monitored Reel</option>'+reelsData.map(r=>'<option value="'+esc(r.url||"")+'">'+esc(r.title||r.url||("Reel "+r.id))+'</option>').join("");
  if(old)sel.value=old;
 }
-function renderClickTasks(){
+async function renderClickTasks(){
  const el=document.querySelector("#clickTaskList");if(!el)return;
- const tasks=getClickTasks();
- if(!tasks.length){el.innerHTML='<div class="empty">No tasks saved yet.</div>';return;}
- el.innerHTML=tasks.map(t=>'<article class="click-task"><div class="click-task-top"><b>Click '+t.clickNumber+'</b><span class="click-task-state">Saved · not running</span></div><div class="click-task-reel">'+esc(t.reelTitle||t.url)+'</div><div class="click-task-meta"><span>'+t.sessions+' session(s)</span><span>Every '+t.interval+' min</span></div><button class="secondary click-delete" type="button" data-delete-task="'+t.id+'">Delete task</button></article>').join("");
- el.querySelectorAll("[data-delete-task]").forEach(b=>b.onclick=()=>{saveClickTasks(getClickTasks().filter(t=>t.id!==b.dataset.deleteTask));renderClickTasks()});
+ el.innerHTML='<div class="empty">Loading tasks from Supabase...</div>';
+ try{
+  const response=await api("click_tasks_list"),data=await response.json();
+  if(!response.ok)throw new Error(data.error||"Could not load tasks");
+  clickTasksData=Array.isArray(data)?data:[];
+  if(!clickTasksData.length){el.innerHTML='<div class="empty">No tasks in Supabase yet.</div>';return;}
+  el.innerHTML=clickTasksData.map(t=>{
+   const status=t.status==="succeeded"?"Received · clicks disabled":t.status==="running"?"Worker received":t.status==="failed"?"Failed":t.status==="cancelled"?"Cancelled":"Queued";
+   return '<article class="click-task"><div class="click-task-top"><b>'+esc(t.click_profile||"Connection test")+'</b><span class="click-task-state">'+esc(status)+'</span></div><div class="click-task-reel">'+esc(t.label||t.target_url||"Playwright task")+'</div><div class="click-task-meta"><span>'+Number(t.repetitions||1)+' run(s)</span><span>Every '+Number(t.interval_minutes||1)+' min</span></div>'+(t.error_message?'<div class="click-task-meta">'+esc(t.error_message)+'</div>':'')+(t.status==="queued"?'<button class="secondary click-delete" type="button" data-delete-task="'+esc(t.id)+'">Delete task</button>':'')+'</article>';
+  }).join("");
+  el.querySelectorAll("[data-delete-task]").forEach(b=>b.onclick=async()=>{
+   if(!confirm("Delete this queued task?"))return;
+   try{const response=await api("click_task_delete",{id:b.dataset.deleteTask}),d=await response.json();if(!response.ok)throw new Error(d.error||"Delete failed");await renderClickTasks();}
+   catch(e){alert(e.message||e);}
+  });
+ }catch(e){el.innerHTML='<div class="empty">Could not load Supabase tasks.<br><br>'+esc(e.message||e)+'</div>';}
 }
 document.querySelectorAll(".click-choice").forEach(b=>b.addEventListener("click",()=>{selectedClickNumber=Number(b.dataset.click);document.querySelectorAll(".click-choice").forEach(x=>x.classList.toggle("active",x===b));}));
 document.querySelector("#clickReelSelect")?.addEventListener("change",e=>{if(e.target.value)document.querySelector("#clickReelUrl").value=e.target.value;});
-document.querySelector("#saveClickTask")?.addEventListener("click",()=>{
+document.querySelector("#saveClickTask")?.addEventListener("click",async()=>{
  const selected=document.querySelector("#clickReelSelect");
  const url=(document.querySelector("#clickReelUrl").value||selected.value||"").trim();
  const sessions=Number(document.querySelector("#clickSessions").value),interval=Number(document.querySelector("#clickInterval").value);
- if(!url){alert("Choose a monitored Reel or enter its URL.");return}
+ if(!url){alert("Choose a monitored Reel or enter a URL.");return}
+ if(!/^https:\/\//i.test(url)){alert("Enter a valid HTTPS URL.");return}
+ if(!["instagram.com","www.instagram.com","m.instagram.com","tiktok.com","www.tiktok.com","vm.tiktok.com","vt.tiktok.com"].some(host=>{try{return new URL(url).hostname.toLowerCase()===host}catch{return false}})){alert("Only an Instagram or TikTok URL is allowed in this task queue.");return}
  if(!Number.isInteger(sessions)||sessions<1||sessions>1000){alert("Sessions must be a whole number from 1 to 1000.");return}
  if(!Number.isInteger(interval)||interval<1||interval>1440){alert("Interval must be a whole number from 1 to 1440 minutes.");return}
  const reel=reelsData.find(r=>(r.url||"")===url);
- const tasks=getClickTasks();
- tasks.unshift({id:String(Date.now())+"-"+Math.random().toString(36).slice(2,7),url,reelTitle:reel?.title||url,clickNumber:selectedClickNumber,sessions,interval,createdAt:new Date().toISOString()});
- saveClickTasks(tasks);renderClickTasks();
+ const btn=document.querySelector("#saveClickTask");btn.disabled=true;btn.textContent="Sending to Supabase...";
+ try{
+  const response=await api("click_task_add",{label:reel?.title||"Playwright UI test",target_url:url,click_profile:"click_"+selectedClickNumber,repetitions:sessions,interval_minutes:interval});
+  const data=await response.json();if(!response.ok)throw new Error(data.error||"Could not save task");
+  document.querySelector("#clickReelUrl").value="";
+  await renderClickTasks();
+  alert("Task sent to Supabase. The local worker can confirm receipt; browser clicks remain disabled.");
+ }catch(e){alert(e.message||e);}
+ finally{btn.disabled=false;btn.textContent="Send task";}
 });
-document.querySelector("#clearClickTasks")?.addEventListener("click",()=>{if(confirm("Delete all saved Clicks tasks?")){saveClickTasks([]);renderClickTasks()}});
+document.querySelector("#clearClickTasks")?.addEventListener("click",()=>alert("For safety, tasks are managed individually from the Supabase queue."));
