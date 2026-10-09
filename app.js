@@ -61,10 +61,14 @@ async function showDetails(id,fromRoute=false){
 window.showDetails=showDetails;
 function routeClipId(){const m=location.pathname.match(/^\/clip\/([^/]+)\/?$/);return m?decodeURIComponent(m[1]):null;}
 function goHome(replace=false){const fn=replace?"replaceState":"pushState";history[fn]({route:"home"},"",location.origin+"/");document.querySelector(".detail-modal")?.remove();}
+function showHomeContent(){document.querySelector("#homeMain")?.classList.remove("hidden");document.querySelector("#clicksPage")?.classList.add("hidden");document.querySelectorAll(".bottom button").forEach(b=>b.classList.remove("active"));document.querySelector("#homeBtn")?.classList.add("active");}
+function showClicksContent(){document.querySelector("#homeMain")?.classList.add("hidden");document.querySelector("#clicksPage")?.classList.remove("hidden");document.querySelectorAll(".bottom button").forEach(b=>b.classList.remove("active"));document.querySelector("#clicksBtn")?.classList.add("active");populateClickReels();renderClickTasks();}
 function openRoute(route,replace=false){
  const fn=replace?"replaceState":"pushState";
  history[fn]({route},"",location.origin+route);
  document.querySelector(".detail-modal")?.remove();
+ if(route==="/clicks"){showClicksContent();return;}
+ showHomeContent();
  if(route==="/")return;
  if(route==="/add"){openModal();return;}
  if(route==="/settings"){settingsModal.classList.remove("hidden");return;}
@@ -78,6 +82,8 @@ window.addEventListener("popstate",()=>{
  document.querySelector("#modal")?.classList.add("hidden");
  settingsModal?.classList.add("hidden");
  document.querySelector("#alertsModal")?.classList.add("hidden");
+ if(location.pathname==="/clicks"){showClicksContent();return;}
+ showHomeContent();
  if(location.pathname==="/")return;
  if(location.pathname==="/add"){openModal();return;}
  if(location.pathname==="/settings"){settingsModal?.classList.remove("hidden");return;}
@@ -88,6 +94,8 @@ window.addEventListener("popstate",()=>{
 });
 async function openClipRoute(){
  const p=location.pathname.replace(/\/$/,"")||"/";
+ if(p==="/clicks"){showClicksContent();return;}
+ showHomeContent();
  if(p==="/")return;
  if(p==="/add"){openModal();return;}
  if(p==="/settings"){settingsModal.classList.remove("hidden");return;}
@@ -295,7 +303,8 @@ document.querySelector("#newReel").onclick=()=>openRoute("/add");
 document.querySelector("#closeBtn").onclick=()=>{closeModal();goHome();};
 document.querySelector("#saveBtn").onclick=addReel;
 document.querySelector("#refreshBtn").onclick=loadReels;
-document.querySelector("#homeBtn").onclick=()=>{closeModal();settingsModal.classList.add("hidden");document.querySelector("#alertsModal")?.classList.add("hidden");goHome();loadReels();};
+document.querySelector("#homeBtn").onclick=()=>{closeModal();settingsModal.classList.add("hidden");document.querySelector("#alertsModal")?.classList.add("hidden");showHomeContent();goHome();loadReels();};
+document.querySelector("#clicksBtn").onclick=()=>openRoute("/clicks");
 document.querySelector("#settingsBtn").onclick=()=>openRoute("/settings");
 document.querySelector("#settingsClose").onclick=()=>{settingsModal.classList.add("hidden");goHome();};
 const test=document.querySelector("#testAlarm");
@@ -346,3 +355,37 @@ async function startup(){
 startup();
 setInterval(()=>{checkAlerts();},15000);
 setInterval(()=>{loadReels();loadAlertHistory();},60000);
+
+// Click-task planner: saves test configuration locally; it does not execute browser actions.
+let selectedClickNumber=1;
+const CLICK_TASKS_KEY="contentMonitorClickTasksV1";
+function getClickTasks(){try{return JSON.parse(localStorage.getItem(CLICK_TASKS_KEY)||"[]")}catch{return []}}
+function saveClickTasks(tasks){localStorage.setItem(CLICK_TASKS_KEY,JSON.stringify(tasks))}
+function populateClickReels(){
+ const sel=document.querySelector("#clickReelSelect");if(!sel)return;
+ const old=sel.value;
+ sel.innerHTML='<option value="">Choose a monitored Reel</option>'+reelsData.map(r=>'<option value="'+esc(r.url||"")+'">'+esc(r.title||r.url||("Reel "+r.id))+'</option>').join("");
+ if(old)sel.value=old;
+}
+function renderClickTasks(){
+ const el=document.querySelector("#clickTaskList");if(!el)return;
+ const tasks=getClickTasks();
+ if(!tasks.length){el.innerHTML='<div class="empty">No tasks saved yet.</div>';return;}
+ el.innerHTML=tasks.map(t=>'<article class="click-task"><div class="click-task-top"><b>Click '+t.clickNumber+'</b><span class="click-task-state">Saved · not running</span></div><div class="click-task-reel">'+esc(t.reelTitle||t.url)+'</div><div class="click-task-meta"><span>'+t.sessions+' session(s)</span><span>Every '+t.interval+' min</span></div><button class="secondary click-delete" type="button" data-delete-task="'+t.id+'">Delete task</button></article>').join("");
+ el.querySelectorAll("[data-delete-task]").forEach(b=>b.onclick=()=>{saveClickTasks(getClickTasks().filter(t=>t.id!==b.dataset.deleteTask));renderClickTasks()});
+}
+document.querySelectorAll(".click-choice").forEach(b=>b.addEventListener("click",()=>{selectedClickNumber=Number(b.dataset.click);document.querySelectorAll(".click-choice").forEach(x=>x.classList.toggle("active",x===b));}));
+document.querySelector("#clickReelSelect")?.addEventListener("change",e=>{if(e.target.value)document.querySelector("#clickReelUrl").value=e.target.value;});
+document.querySelector("#saveClickTask")?.addEventListener("click",()=>{
+ const selected=document.querySelector("#clickReelSelect");
+ const url=(document.querySelector("#clickReelUrl").value||selected.value||"").trim();
+ const sessions=Number(document.querySelector("#clickSessions").value),interval=Number(document.querySelector("#clickInterval").value);
+ if(!url){alert("Choose a monitored Reel or enter its URL.");return}
+ if(!Number.isInteger(sessions)||sessions<1||sessions>1000){alert("Sessions must be a whole number from 1 to 1000.");return}
+ if(!Number.isInteger(interval)||interval<1||interval>1440){alert("Interval must be a whole number from 1 to 1440 minutes.");return}
+ const reel=reelsData.find(r=>(r.url||"")===url);
+ const tasks=getClickTasks();
+ tasks.unshift({id:String(Date.now())+"-"+Math.random().toString(36).slice(2,7),url,reelTitle:reel?.title||url,clickNumber:selectedClickNumber,sessions,interval,createdAt:new Date().toISOString()});
+ saveClickTasks(tasks);renderClickTasks();
+});
+document.querySelector("#clearClickTasks")?.addEventListener("click",()=>{if(confirm("Delete all saved Clicks tasks?")){saveClickTasks([]);renderClickTasks()}});
