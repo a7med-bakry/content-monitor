@@ -393,7 +393,7 @@ document.querySelector("#saveClickTask")?.addEventListener("click",async()=>{
  if(!url){alert("Choose a monitored Reel or enter a URL.");return}
  let parsedUrl;try{parsedUrl=new URL(url)}catch{alert("Enter a valid URL.");return}
  if(parsedUrl.protocol!=="https:"){alert("Only HTTPS URLs are accepted.");return}
- if(!Number.isInteger(clickX)||clickX<0||clickX>10000||!Number.isInteger(clickY)||clickY<0||clickY>10000){alert("Enter whole-number X and Y coordinates from 0 to 10000.");return}
+ if(!Number.isInteger(clickX)||clickX<0||clickX>1919||!Number.isInteger(clickY)||clickY<0||clickY>1079){alert("Enter whole-number viewport coordinates: X 0–1919 and Y 0–1079.");return}
  if(!Number.isInteger(sessions)||sessions<1||sessions>1000){alert("Sessions must be a whole number from 1 to 1000.");return}
  if(!Number.isInteger(interval)||interval<1||interval>1440){alert("Interval must be a whole number from 1 to 1440 minutes.");return}
  const reel=reelsData.find(r=>(r.url||"")===url);
@@ -403,7 +403,7 @@ document.querySelector("#saveClickTask")?.addEventListener("click",async()=>{
   const data=await response.json();if(!response.ok)throw new Error(data.error||"Could not save task");
   document.querySelector("#clickReelUrl").value="";
   await renderClickTasks();
-  alert("Task sent to Supabase. The local worker will open the HTTPS URL and click the selected coordinates.");
+  alert("Task sent to Supabase. The local worker will ask for approval in PowerShell before opening the HTTPS URL and clicking the selected viewport coordinates.");
  }catch(e){alert(e.message||e);}
  finally{btn.disabled=false;btn.textContent="Send task";}
 });
