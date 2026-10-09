@@ -17,6 +17,12 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
 const rl = readline.createInterface({ input: stdin, output: stdout });
 const POLL_MS = 5000;
 const VIEWPORT = { width: 1920, height: 1080 };
+const SETUP_CLICK = { x: 994, y: 373 };
+const CLICK_POSITIONS = {
+  click_1: { x: 804, y: 527 },
+  click_2: { x: 1029, y: 59 },
+  click_3: { x: 1072, y: 519 }
+};
 let stopping = false;
 
 function wait(ms) {
@@ -54,7 +60,11 @@ function validateTask(task) {
   let u;
   try { u = new URL(task.target_url); } catch { throw new Error("Task URL is invalid."); }
   if (u.protocol !== "https:" || !u.hostname) throw new Error("Only valid HTTPS URLs are accepted.");
-  if (!["click_1", "click_2", "click_3"].includes(task.click_profile)) throw new Error("Unknown click profile.");
+  if (!Object.prototype.hasOwnProperty.call(CLICK_POSITIONS, task.click_profile)) throw new Error("Unknown click profile.");
+  const expectedPosition = CLICK_POSITIONS[task.click_profile];
+  if (task.click_x !== expectedPosition.x || task.click_y !== expectedPosition.y) {
+    throw new Error("Saved coordinates do not match " + task.click_profile + ". Cancel this old task and create it again from the updated Clicks page.");
+  }
   if (!Number.isInteger(task.click_x) || task.click_x < 0 || task.click_x >= VIEWPORT.width) {
     throw new Error("X must be between 0 and " + (VIEWPORT.width - 1) + " for the 1920px browser viewport.");
   }
@@ -76,7 +86,8 @@ async function processTask(task) {
   console.log("Label: " + task.label);
   console.log("URL: " + task.target_url);
   console.log("Profile: " + task.click_profile);
-  console.log("Coordinates: X=" + task.click_x + ", Y=" + task.click_y);
+  console.log("Setup click: X=" + SETUP_CLICK.x + ", Y=" + SETUP_CLICK.y);
+  console.log("Target coordinates: X=" + task.click_x + ", Y=" + task.click_y);
   console.log("Runs: " + task.repetitions + " | Interval: " + task.interval_minutes + " minute(s)");
   console.log("Only approve if you trust this URL and intend to click this location.");
   const answer = (await rl.question('Type RUN to approve this task, or anything else to cancel: ')).trim();
@@ -100,9 +111,17 @@ async function processTask(task) {
 
     for (let run = 1; run <= task.repetitions; run++) {
       await page.goto(url.toString(), { waitUntil: "domcontentloaded", timeout: 60000 });
+      console.log("Waiting 4 seconds before clicks...");
+      await wait(4000);
+      console.log("Setup click before " + task.click_profile + "...");
+      await page.mouse.click(SETUP_CLICK.x, SETUP_CLICK.y);
+      clickLog.push({ run, type: "setup", clicked: true, x: SETUP_CLICK.x, y: SETUP_CLICK.y, at: new Date().toISOString(), finalUrl: page.url() });
+      await wait(1000);
+      console.log("Target click " + run + "/" + task.repetitions + "...");
       await page.mouse.click(task.click_x, task.click_y);
-      clickLog.push({ run, clicked: true, x: task.click_x, y: task.click_y, at: new Date().toISOString(), finalUrl: page.url() });
-      console.log("Run " + run + "/" + task.repetitions + ": clicked X=" + task.click_x + ", Y=" + task.click_y);
+      clickLog.push({ run, type: "target", clicked: true, x: task.click_x, y: task.click_y, at: new Date().toISOString(), finalUrl: page.url() });
+      await wait(2000);
+      console.log("Run " + run + "/" + task.repetitions + ": setup X=" + SETUP_CLICK.x + ", Y=" + SETUP_CLICK.y + "; target X=" + task.click_x + ", Y=" + task.click_y);
       if (run < task.repetitions) {
         console.log("Waiting " + task.interval_minutes + " minute(s) before next run...");
         await wait(task.interval_minutes * 60 * 1000);
