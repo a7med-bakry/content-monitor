@@ -273,3 +273,6 @@
 .click-delete{margin-top:12px;width:100%}
 .task-list-head{margin-top:8px}
 @media(max-width:520px){.clicks-page{padding-left:12px;padding-right:12px}.clicks-panel{padding:13px}.click-task-top{align-items:flex-start;flex-direction:column}.click-task-state{align-self:flex-start}}
+
+/* Four-item bottom navigation */
+.bottom{grid-template-columns:repeat(4,minmax(0,1fr))!important}
