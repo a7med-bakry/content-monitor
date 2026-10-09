@@ -81,6 +81,21 @@ function validateTask(task) {
 }
 
 async function processTask(task) {
+  let url;
+  try {
+    url = validateTask(task);
+  } catch (error) {
+    const message = String(error && error.message || error).slice(0, 2000);
+    await updateTask(task.id, {
+      status: "failed",
+      completed_at: new Date().toISOString(),
+      error_message: message,
+      result: { execution: "validation_rejected", reason: message }
+    });
+    console.error("Task rejected before approval; no browser was launched and no clicks were executed:", message);
+    return;
+  }
+
   console.log("\n----------------------------------------");
   console.log("Task awaiting local approval");
   console.log("Label: " + task.label);
@@ -104,7 +119,6 @@ async function processTask(task) {
   let browser;
   const clickLog = [];
   try {
-    const url = validateTask(task);
     browser = await chromium.launch({ headless: true });
     const context = await browser.newContext({ viewport: VIEWPORT });
     const page = await context.newPage();
@@ -136,7 +150,7 @@ async function processTask(task) {
         click_profile: task.click_profile,
         viewport: VIEWPORT,
         requested_runs: task.repetitions,
-        completed_runs: clickLog.length,
+        completed_runs: clickLog.filter(item => item.type === "target").length,
         clicks: clickLog
       }
     });
