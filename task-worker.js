@@ -161,7 +161,7 @@ async function processTask(task) {
         status: "failed",
         completed_at: new Date().toISOString(),
         error_message: String(error && error.message || error).slice(0, 2000),
-        result: { execution: "approved_local_worker", completed_runs: clickLog.length, clicks: clickLog }
+        result: { execution: "approved_local_worker", completed_runs: clickLog.filter(item => item.type === "target").length, clicks: clickLog }
       });
     } catch (updateError) {
       console.error("Could not update failed task status:", updateError.message || updateError);
