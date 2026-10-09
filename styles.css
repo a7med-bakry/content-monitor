@@ -248,3 +248,28 @@
 /* Match Monitoring action button size with the other reel actions */
 .detail-actions .primary{height:44px!important;padding:11px 13px!important;font-size:12px!important;margin-top:0!important;}
 .detail-actions .secondary{height:44px!important;padding:11px 13px!important;font-size:12px!important;display:flex!important;align-items:center!important;justify-content:center!important;}
+
+
+/* Clicks task planner */
+.hidden{display:none!important}
+.clicks-page{padding:0 20px 28px}
+.clicks-heading{align-items:center}
+.clicks-local-note{font-size:10px;color:#9aa4b4;border:1px solid #29313e;background:#121821;padding:7px 9px;border-radius:99px}
+.clicks-panel{padding:16px;border:1px solid #202936;border-radius:20px;background:linear-gradient(145deg,#131923,#0b0f15);margin-bottom:25px}
+.clicks-panel .hint{margin-top:0}
+.click-options-label{font-size:11px;color:#8b96a7;font-weight:650;margin-top:17px}
+.click-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px}
+.click-choice{padding:13px 8px;border:1px solid #29313e;background:#090c11;color:#8994a5;border-radius:12px;font-weight:800}
+.click-choice.active{border-color:#dce2eb;background:#e9edf3;color:#0b0e13}
+.click-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.click-task-list{display:grid;gap:10px}
+.click-task{padding:15px;border:1px solid #252e3b;background:#111720;border-radius:17px}
+.click-task-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.click-task-top>b{font-size:14px}
+.click-task-state{font-size:9px;color:#e9c96c;background:#30280f;padding:6px 8px;border-radius:99px}
+.click-task-reel{font-size:12px;color:#b7c0ce;margin-top:9px;overflow-wrap:anywhere}
+.click-task-meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.click-task-meta span{font-size:10px;color:#8e99aa;padding:6px 8px;border-radius:8px;background:#0a0e14}
+.click-delete{margin-top:12px;width:100%}
+.task-list-head{margin-top:8px}
+@media(max-width:520px){.clicks-page{padding-left:12px;padding-right:12px}.clicks-panel{padding:13px}.click-task-top{align-items:flex-start;flex-direction:column}.click-task-state{align-self:flex-start}}
